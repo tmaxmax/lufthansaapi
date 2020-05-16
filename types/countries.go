@@ -11,7 +11,7 @@ type countryNames []countryName
 func (cns *countryNames) UnmarshalJSON(data []byte) error {
 	if data[0] == '[' {
 		return json.Unmarshal(data, (*[]countryName)(cns))
-	} else if data[0] == '"' {
+	} else if data[0] == '{' {
 		var cn countryName
 		if err := json.Unmarshal(data, &cn); err != nil {
 			return err
@@ -32,7 +32,7 @@ type countries []country
 func (cs *countries) UnmarshalJSON(data []byte) error {
 	if data[0] == '[' {
 		return json.Unmarshal(data, (*[]country)(cs))
-	} else if data[0] == '"' {
+	} else if data[0] == '{' {
 		var c country
 		if err := json.Unmarshal(data, &c); err != nil {
 			return err
@@ -51,7 +51,7 @@ type links []link
 func (ls *links) UnmarshalJSON(data []byte) error {
 	if data[0] == '[' {
 		return json.Unmarshal(data, (*[]link)(ls))
-	} else if data[0] == '"' {
+	} else if data[0] == '{' {
 		var l link
 		if err := json.Unmarshal(data, &l); err != nil {
 			return err
@@ -75,6 +75,6 @@ type CountriesResponse struct {
 		Countries struct {
 			Country countries `json:"Country"`
 		} `json:"Countries"`
+		Meta responseMeta `json:"Meta"`
 	} `json:"CountryResource"`
-	Meta responseMeta `json:"Meta"`
 }

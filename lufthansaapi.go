@@ -3,8 +3,6 @@ package lufthansa
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -79,7 +77,7 @@ func (a *API) getNewToken() error {
 // fetch function returns the API response from the provided URL as an io.Reader, making it
 // easy to decode JSON afterwards, in the required format. This function is called by all the
 // API's Fetch exported functions.
-func (a *API) fetch(url string) (io.Reader, error) {
+func (a *API) fetch(url string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -90,14 +88,7 @@ func (a *API) fetch(url string) (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return strings.NewReader(string(body)), nil
+	return res, nil
 }
 
 // NewAPI constructs the API object, having as parametres the client's ID and client's secret.

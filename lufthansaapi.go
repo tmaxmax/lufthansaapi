@@ -11,13 +11,16 @@ import (
 )
 
 const (
-	// APIOauth represents the URL directing to the Oauth token generation
-	APIOauth string = "https://api.lufthansa.com/v1/oauth/token"
-	// APIFetch is the main URL used to get data from the API
-	APIFetch string = "https://api.lufthansa.com/v1"
+	// FetchAPI is the main URL used to get data from the API
+	FetchAPI string = "https://api.lufthansa.com/v1"
+	// OauthAPI represents the URL directing to the Oauth token generation
+	OauthAPI string = FetchAPI + "/oauth/token"
 )
 
-// Token represents the object returned by the Lufthansa Oauth, containing the access token, token type and expiration time.
+// Token represents the object returned by the Lufthansa Oauth,
+// containing the access token, token type and expiration time.
+// It also holds a generationTime timestamp, that is used for
+// obtaining a new access token, when the old one expired.
 type Token struct {
 	AccessToken    string `json:"access_token"`
 	TokenType      string `json:"token_type"`
@@ -25,20 +28,20 @@ type Token struct {
 	generationTime time.Time
 }
 
-func (t Token) String() string {
-	return fmt.Sprintf("%s %s", strings.Title(t.TokenType), t.AccessToken)
-}
-
 // API represents the main object that you will use to interact with the Lufthansa API.
 type API struct {
 	clientID     string
 	clientSecret string
-	token        Token
+	token        *Token
+}
+
+func (t Token) String() string {
+	return fmt.Sprintf("%s %s", strings.Title(t.TokenType), t.AccessToken)
 }
 
 func (a *API) getToken() error {
 	payload := strings.NewReader(fmt.Sprintf("client_id=%s&client_secret=%s&grant_type=client_credentials", a.clientID, a.clientSecret))
-	req, err := http.NewRequest("POST", APIOauth, payload)
+	req, err := http.NewRequest("POST", OauthAPI, payload)
 	if err != nil {
 		return err
 	}
@@ -57,7 +60,7 @@ func (a *API) getToken() error {
 	}
 	t.generationTime = time.Now()
 
-	a.token = *t
+	a.token = t
 	return nil
 }
 
@@ -73,20 +76,9 @@ func (a *API) getNewToken() error {
 	return nil
 }
 
-// NewAPI constructs the API object, having as parametres the client's ID and client's secret.
-func NewAPI(id, secret string) (*API, error) {
-	ret := &API{}
-	ret.clientID = id
-	ret.clientSecret = secret
-	err := ret.getToken()
-	if err != nil {
-		return &API{}, err
-	}
-	return ret, nil
-}
-
 // fetch function returns the API response from the provided URL as an io.Reader, making it
-// easy to decode JSON afterwards
+// easy to decode JSON afterwards, in the required format. This function is called by all the
+// API's Fetch exported functions.
 func (a *API) fetch(url string) (io.Reader, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -106,4 +98,16 @@ func (a *API) fetch(url string) (io.Reader, error) {
 	}
 
 	return strings.NewReader(string(body)), nil
+}
+
+// NewAPI constructs the API object, having as parametres the client's ID and client's secret.
+func NewAPI(id, secret string) (*API, error) {
+	ret := &API{}
+	ret.clientID = id
+	ret.clientSecret = secret
+	err := ret.getToken()
+	if err != nil {
+		return &API{}, err
+	}
+	return ret, nil
 }

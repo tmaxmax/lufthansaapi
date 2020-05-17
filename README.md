@@ -4,5 +4,5 @@ This is an unofficial Go wrapper for the Lufthansa Open API. It is still under w
 
 ## Contributions
 
-If you wish to contribute, fork this repository, do your work, and open a pull request.
+If you wish to contribute, fork this repository, do your work, and open a pull request in the **develop** branch.
 Visual Studio Code users shall use the provided settings.json. If you're working in another IDE, make sure your settings reflect settings.json. Please use gofmt!

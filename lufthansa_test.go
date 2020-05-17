@@ -53,7 +53,7 @@ func TestFetchCountries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("API initialization failed: %v", err)
 	}
-	fetched, err := api.FetchCountries(CountriesParams{})
+	fetched, err := api.FetchCountries(CountriesParams{Limit: 100, Offset: 50})
 	switch fetched.(type) {
 	case *types.CountriesResponse:
 		cr := fetched.(*types.CountriesResponse)

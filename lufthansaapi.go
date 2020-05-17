@@ -75,14 +75,14 @@ func (a *API) getNewToken() error {
 }
 
 // fetch function returns the API response from the provided URL as an io.Reader, making it
-// easy to decode JSON afterwards, in the required format. This function is called by all the
+// easy to decode XML afterwards, in the required format. This function is called by all the
 // API's Fetch exported functions.
 func (a *API) fetch(url string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("content-type", "application/json")
+	req.Header.Add("accept", "application/xml")
 	req.Header.Add("authorization", a.token.String())
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {

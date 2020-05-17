@@ -1,44 +1,39 @@
 package lufthansa
 
 import (
-	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"strings"
-
-	"github.com/tmaxmax/lufthansaapi/types"
 )
 
 const referenceAPI string = FetchAPI + "/mds-references"
 
-/*CountriesParams is a struct containing the Fetch Countries parameters
-used to request from the API the Countries reference.
-
-Fields:
- - CountryCode is a 2-letter ISO 3166-1 country code, used when you only
-   want to request information about a single country, represented by the
-   code.
- - Lang is 2 letter ISO 3166-1 language code, used to tell the API in what
-   language should the country names be sent. If it isn't given a value, the
-   API sends the country names in all available languages.
- - Limit represents the number of records returned per request. Default is set
-   to 20, maximum is 100 (if a value bigger than 100 is given, 100 will be taken)
- - Offset represents the number of records skipped (default is 0). For example,
-   if offset is 20 and limit is 100, the response will contain records from
-   country no. 20 to country no. 119 (100 countries).
-*/
-type CountriesParams struct {
-	CountryCode string
-	Lang        string
-	Limit       int
-	Offset      int
+// RefParams is a struct containing the parameters
+// used to make requests to any of the Reference APIs
+//
+// Fields:
+//  - Code will differ based on the references you request. See each Fetch function's mentions.
+//  - Lang is 2 letter ISO 3166-1 language code, used to tell the API in what
+//    language should the country names be sent. If it isn't given a value, the
+//    API sends the country names in all available languages.
+//  - Limit represents the number of records returned per request. Default is set
+//    to 20, maximum is 100 (if a value bigger than 100 is given, 100 will be taken)
+//  - Offset represents the number of records skipped (default is 0). For example,
+//    if offset is 20 and limit is 100, the response will contain records from
+//    country no. 20 to country no. 119 (100 countries).
+type RefParams struct {
+	Code   string
+	Lang   string
+	Limit  int
+	Offset int
 }
 
 // ToURL transforms a CountriesParams struct into an URL usable format,
 // so that it can be concatenated to te Request API URL.
-func (p CountriesParams) ToURL() string {
+func (p RefParams) ToURL() string {
 	var ret string
-	if p.CountryCode != "" {
-		ret += p.CountryCode
+	if p.Code != "" {
+		ret += p.Code
 	}
 	if p.Lang != "" {
 		ret += "?lang=" + p.Lang
@@ -51,14 +46,18 @@ func (p CountriesParams) ToURL() string {
 	return ret
 }
 
-// FetchCountries makes an API request for the Countries reference, using the
-// passed FetchCountriesParams struct fields. For more information about the
-// request parameters, check the FetchCountriesParams struct documentation.
+// FetchCountries requests from the countries reference. Pass parametres as mentioned in
+// the API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Countries.
 //
-// The function returns a pointer to the fetched JSON and an error. The error is
-// always nil when the pointer returned isn't null. You have to type assert the
-// interface to use the result.
-func (a *API) FetchCountries(p CountriesParams) (interface{}, error) {
+// The function returns a pointer to a struct containing the decoded data.
+// You must use type assertion to get the result, as it can be of the following types:
+//  - CountriesResponse
+//  - APIError
+//  - TokenError
+// Assert for all of them in a switch statement.
+//
+// Lufthansa API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Countries
+func (a *API) FetchCountries(p RefParams) (interface{}, error) {
 	url := fmt.Sprintf("%s/countries/%s", referenceAPI, p.ToURL())
 	res, err := a.fetch(url)
 	if err != nil {
@@ -67,8 +66,40 @@ func (a *API) FetchCountries(p CountriesParams) (interface{}, error) {
 
 	switch res.StatusCode {
 	case 200:
-		ret := &types.CountriesResponse{}
-		err = json.NewDecoder(res.Body).Decode(ret)
+		ret := &CountriesResponse{}
+		err = xml.NewDecoder(res.Body).Decode(ret)
+		if err != nil {
+			return nil, err
+		}
+		res.Body.Close()
+		return ret, nil
+	default:
+		return decodeErrors(res)
+	}
+}
+
+// FetchCities requests from the cities reference. Pass parametres as mentioned in
+// the API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Cities.
+//
+// The function returns a pointer to a struct containing the decoded data.
+// You must use type assertion to get the result, as it can be of the following types:
+// - CitiesResponse
+// - APIError
+// - TokenError
+// Assert for all of them in a switch statement.
+//
+// Lufthansa API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Cities
+func (a *API) FetchCities(p RefParams) (interface{}, error) {
+	url := fmt.Sprintf("%s/cities/%s", referenceAPI, p.ToURL())
+	res, err := a.fetch(url)
+	if err != nil {
+		return nil, err
+	}
+
+	switch res.StatusCode {
+	case 200:
+		ret := &CitiesResponse{}
+		err = xml.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
 			return nil, err
 		}

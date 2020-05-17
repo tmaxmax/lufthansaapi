@@ -1,14 +1,13 @@
 package lufthansa
 
 import (
+	"log"
 	"os"
 	"testing"
-
-	"github.com/tmaxmax/lufthansaapi/types"
 )
 
 type TestCountryURLItem struct {
-	f      CountriesParams
+	f      RefParams
 	Result string
 }
 
@@ -24,15 +23,23 @@ type userAPIs struct {
 	APIs []API `json:"apis"`
 }
 
+func initializeAPI() *API {
+	api, err := NewAPI(os.Getenv("LOA_ID"), os.Getenv("LOA_SECRET"))
+	if err != nil {
+		log.Fatalf("API initialization failed: %v\n", err)
+	}
+	return api
+}
+
 func TestCountryURLs(t *testing.T) {
 	tests := []TestCountryURLItem{
-		{CountriesParams{}, ""},
-		{CountriesParams{Lang: "EN"}, "?lang=EN"},
-		{CountriesParams{CountryCode: "DK"}, "DK"},
-		{CountriesParams{Lang: "EN", CountryCode: "DK"}, "DK?lang=EN"},
-		{CountriesParams{Limit: 20}, "?limit=20"},
-		{CountriesParams{Limit: 20, Offset: 1}, "?limit=20&offset=1"},
-		{CountriesParams{Lang: "EN", Limit: 20, Offset: 1}, "?lang=EN&limit=20&offset=1"},
+		{RefParams{}, ""},
+		{RefParams{Lang: "EN"}, "?lang=EN"},
+		{RefParams{Code: "DK"}, "DK"},
+		{RefParams{Lang: "EN", Code: "DK"}, "DK?lang=EN"},
+		{RefParams{Limit: 20}, "?limit=20"},
+		{RefParams{Limit: 20, Offset: 1}, "?limit=20&offset=1"},
+		{RefParams{Lang: "EN", Limit: 20, Offset: 1}, "?lang=EN&limit=20&offset=1"},
 	}
 
 	t.Logf("Testing Country URLs...\n")
@@ -49,23 +56,26 @@ func TestCountryURLs(t *testing.T) {
 func TestFetchCountries(t *testing.T) {
 	t.Logf("Testing Fetch Countries...\n")
 
-	api, err := NewAPI(os.Getenv("LOA_ID"), os.Getenv("LOA_SECRET"))
+	api := initializeAPI()
+
+	fetched, err := api.FetchCountries(RefParams{Limit: 5, Offset: 0, Lang: "EN"})
 	if err != nil {
-		t.Fatalf("API initialization failed: %v", err)
+		t.Errorf("Failed to fetch countries... error: %v", err)
+		return
 	}
-	fetched, err := api.FetchCountries(CountriesParams{Limit: 100, Offset: 50})
+
 	switch fetched.(type) {
-	case *types.CountriesResponse:
-		cr := fetched.(*types.CountriesResponse)
-		t.Logf("%+v", cr)
-	case *types.APIError:
-		cr := fetched.(*types.APIError)
-		t.Logf("%+v", cr)
-	case *types.TokenError:
-		cr := fetched.(*types.TokenError)
-		t.Logf("%+v", cr)
+	case *CountriesResponse:
+		cr := fetched.(*CountriesResponse)
+		t.Logf("%+v\n", cr)
+	case *APIError:
+		cr := fetched.(*APIError)
+		t.Logf("%+v\n", cr)
+	case *TokenError:
+		cr := fetched.(*TokenError)
+		t.Logf("%+v\n", cr)
 	default:
 		cr := fetched.(string)
-		t.Errorf("%s", cr)
+		t.Errorf("%s\n", cr)
 	}
 }

@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+const (
+	referenceAPI string = fetchAPI + "/mds-references"
+)
+
 // RefParams is a struct containing the parameters
 // used to make requests to any of the Reference APIs
 //

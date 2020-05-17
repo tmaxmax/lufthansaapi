@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+const (
+	fetchAPI string = "https://api.lufthansa.com/v1"
+	oauthAPI string = fetchAPI + "/oauth/token"
+)
+
 // Token represents the object returned by the Lufthansa Oauth,
 // containing the access token, token type and expiration time.
 // It also holds a generationTime timestamp, that is used for

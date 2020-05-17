@@ -41,7 +41,7 @@ func decodeErrors(res *http.Response) (interface{}, error) {
 		}
 		return ret, nil
 	case 401, 403:
-		ret := &TokenError{}
+		ret := &GatewayError{}
 		err := json.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
 			return nil, err

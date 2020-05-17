@@ -11,10 +11,10 @@ type TokenError struct {
 // Fields are analoguous to the XML sent. See https://developer.lufthansa.com/docs/read/api_basics/Error_Messages
 // for more information.
 type APIError struct {
-	RetryIndicator bool   `xml:"ProcessingErrors>ProcessingError>RetryIndicator,attr"`
-	Type           string `xml:"ProcessingErrors>ProcessingError>Type,chardata"`
-	Description    string `xml:"ProcessingErrors>ProcessingError>Description,chardata"`
-	InfoURL        string `xml:"ProcessingErrors>ProcessingError>InfoURL,chardata"`
+	RetryIndicator bool   `xml:"ProcessingError,RetryIndicator,attr"`
+	Type           string `xml:"ProcessingError>Type"`
+	Description    string `xml:"ProcessingError>Description"`
+	InfoURL        string `xml:"ProcessingError>InfoURL"`
 }
 
 type metaLink struct {

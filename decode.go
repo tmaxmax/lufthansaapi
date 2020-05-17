@@ -33,14 +33,14 @@ func decodeErrors(res *http.Response) (interface{}, error) {
 	defer res.Body.Close()
 
 	switch res.StatusCode {
-	case 400, 402, 403, 404, 405:
+	case 400, 402, 404, 405:
 		ret := &APIError{}
 		err := xml.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
 			return nil, err
 		}
 		return ret, nil
-	case 401:
+	case 401, 403:
 		ret := &TokenError{}
 		err := json.NewDecoder(res.Body).Decode(ret)
 		if err != nil {

@@ -1,9 +1,9 @@
 package lufthansa
 
-// TokenError struct is the object that JSON is decoded in when
+// GatewayError struct is the object that JSON is decoded in when
 // the status response from the request is 401, which means the token
 // is invalid or missing.
-type TokenError struct {
+type GatewayError struct {
 	Error string `json:"Error"`
 }
 

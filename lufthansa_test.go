@@ -67,13 +67,13 @@ func TestFetchCountries(t *testing.T) {
 	sleeptime, _ := time.ParseDuration(testdelay)
 
 	testparams := []RefParams{
-		RefParams{},
-		RefParams{Lang: "EN"},
-		RefParams{Code: "DK"},
-		RefParams{Limit: 5, Lang: "FR"},
-		RefParams{Code: "ZZ"},
-		RefParams{Limit: 100, Offset: 50},
-		RefParams{Limit: 50, Offset: 30, Lang: "HR"},
+		{},
+		{Lang: "EN"},
+		{Code: "DK"},
+		{Limit: 5, Lang: "FR"},
+		{Code: "ZZ"},
+		{Limit: 100, Offset: 50},
+		{Limit: 50, Offset: 30, Lang: "HR"},
 	}
 
 	for i, p := range testparams {
@@ -114,13 +114,13 @@ func TestFetchCities(t *testing.T) {
 	sleeptime, _ := time.ParseDuration(testdelay)
 
 	testparams := []RefParams{
-		RefParams{},
-		RefParams{Lang: "EN"},
-		RefParams{Code: "NYC"},
-		RefParams{Limit: 5, Lang: "FR"},
-		RefParams{Code: "ZZ"},
-		RefParams{Limit: 1000, Offset: 4000},
-		RefParams{Limit: 9876, Offset: 5432, Lang: "HR"},
+		{},
+		{Lang: "EN"},
+		{Code: "NYC"},
+		{Limit: 5, Lang: "FR"},
+		{Code: "ZZ"},
+		{Limit: 1000, Offset: 4000},
+		{Limit: 9876, Offset: 5432, Lang: "HR"},
 	}
 
 	for i, p := range testparams {

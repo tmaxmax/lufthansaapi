@@ -8,13 +8,6 @@ import (
 	"time"
 )
 
-const (
-	// FetchAPI is the main URL used to get data from the API
-	FetchAPI string = "https://api.lufthansa.com/v1"
-	// OauthAPI represents the URL directing to the Oauth token generation
-	OauthAPI string = FetchAPI + "/oauth/token"
-)
-
 // Token represents the object returned by the Lufthansa Oauth,
 // containing the access token, token type and expiration time.
 // It also holds a generationTime timestamp, that is used for
@@ -39,7 +32,7 @@ func (t Token) String() string {
 
 func (a *API) getToken() error {
 	payload := strings.NewReader(fmt.Sprintf("client_id=%s&client_secret=%s&grant_type=client_credentials", a.clientID, a.clientSecret))
-	req, err := http.NewRequest("POST", OauthAPI, payload)
+	req, err := http.NewRequest("POST", oauthAPI, payload)
 	if err != nil {
 		return err
 	}

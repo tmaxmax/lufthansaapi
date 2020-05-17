@@ -48,7 +48,7 @@ type CountriesResponse struct {
 }
 
 type cityName struct {
-	Languagecode string `xml:"LanguageCode,attr"`
+	LanguageCode string `xml:"LanguageCode,attr"`
 	Name         string `xml:",chardata"`
 }
 

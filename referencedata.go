@@ -3,31 +3,12 @@ package lufthansa
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"strings"
 
 	"github.com/tmaxmax/lufthansaapi/types"
 )
 
 const referenceAPI string = FetchAPI + "/mds-references"
-
-// processLimitOffset transforms the general limit and offset parameters,
-// which are available for most of the API requests, into an usable string
-// for creating the API request URL.
-func processLimitOffset(l, o int) string {
-	var ret string
-	if l != 0 {
-		ret += fmt.Sprintf("limit=%d", l)
-	}
-	if o != 0 {
-		if strings.Contains(ret, "limit") {
-			ret += fmt.Sprintf("&offset=%d", o)
-		} else {
-			ret += fmt.Sprintf("offset=%d", o)
-		}
-	}
-	return ret
-}
 
 /*CountriesParams is a struct containing the Fetch Countries parameters
 used to request from the API the Countries reference.
@@ -83,35 +64,17 @@ func (a *API) FetchCountries(p CountriesParams) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
 
 	switch res.StatusCode {
 	case 200:
 		ret := &types.CountriesResponse{}
-		err = json.Unmarshal(body, ret)
+		err = json.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
 			return nil, err
 		}
-		return ret, nil
-	case 400, 402, 403, 404, 405:
-		ret := &types.APIError{}
-		err = json.Unmarshal(body, ret)
-		if err != nil {
-			return nil, err
-		}
-		return ret, nil
-	case 401:
-		ret := &types.TokenError{}
-		err = json.Unmarshal(body, ret)
-		if err != nil {
-			return nil, err
-		}
+		res.Body.Close()
 		return ret, nil
 	default:
-		return string(body) + fmt.Sprintf(" -- %d", res.StatusCode), err
+		return decodeErrors(res)
 	}
 }

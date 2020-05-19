@@ -18,18 +18,6 @@ type TestCountryURLItem struct {
 	Result string
 }
 
-// userAPI is the format an API access information is written in my JSON file
-type userAPI struct {
-	APIName      string `json:"name"`
-	ClientID     string `json:"id"`
-	ClientSecret string `json:"secret"`
-}
-
-// MyAPIs is the format my accessible userAPIs credentials are passed
-type userAPIs struct {
-	APIs []API `json:"apis"`
-}
-
 func initializeAPI() *API {
 	api, err := NewAPI(os.Getenv("LOA_ID"), os.Getenv("LOA_SECRET"))
 	if err != nil {
@@ -64,9 +52,9 @@ func TestFetchCountries(t *testing.T) {
 	t.Logf("Testing Fetch Countries...\n")
 
 	api := initializeAPI()
-	sleeptime, _ := time.ParseDuration(testdelay)
+	sleepTime, _ := time.ParseDuration(testdelay)
 
-	testparams := []RefParams{
+	testParams := []RefParams{
 		{},
 		{Lang: "EN"},
 		{Code: "DK"},
@@ -76,7 +64,7 @@ func TestFetchCountries(t *testing.T) {
 		{Limit: 50, Offset: 30, Lang: "HR"},
 	}
 
-	for i, p := range testparams {
+	for i, p := range testParams {
 		t.Logf("\nTest %d...\n", i)
 
 		fetched, err := api.FetchCountries(p)
@@ -103,7 +91,7 @@ func TestFetchCountries(t *testing.T) {
 			t.Errorf("%+v", val)
 		}
 
-		time.Sleep(sleeptime)
+		time.Sleep(sleepTime)
 	}
 }
 
@@ -111,9 +99,9 @@ func TestFetchCities(t *testing.T) {
 	t.Logf("\nTesting Fetch Cities...\n")
 
 	api := initializeAPI()
-	sleeptime, _ := time.ParseDuration(testdelay)
+	sleepTime, _ := time.ParseDuration(testdelay)
 
-	testparams := []RefParams{
+	testParams := []RefParams{
 		{},
 		{Lang: "EN"},
 		{Code: "NYC"},
@@ -123,7 +111,7 @@ func TestFetchCities(t *testing.T) {
 		{Limit: 9876, Offset: 5432, Lang: "HR"},
 	}
 
-	for i, p := range testparams {
+	for i, p := range testParams {
 		t.Logf("\nTest %d...\n", i)
 
 		fetched, err := api.FetchCities(p)
@@ -150,6 +138,6 @@ func TestFetchCities(t *testing.T) {
 			t.Errorf("%+v", val)
 		}
 
-		time.Sleep(sleeptime)
+		time.Sleep(sleepTime)
 	}
 }

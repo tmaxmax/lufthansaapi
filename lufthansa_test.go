@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	testdelay          string = "200ms"
+	testDelay          string = "200ms"
 	formatAPIError     string = "API Error\nRetryIndicator: %t\nType: %s\nDescription: %s\nInfoURL: %s\n"
 	formatGatewayError string = "Gateway Error: %s\n"
 )
@@ -24,6 +24,20 @@ func initializeAPI() *API {
 		log.Fatalf("API initialization failed: %v\n", err)
 	}
 	return api
+}
+
+func apiFetchTestHasError(t *testing.T, err error, i int, apiError *APIError, gatewayError *GatewayError) bool {
+	if err != nil {
+		t.Errorf("Test %d failed, error: %+v", i, err)
+		return true
+	} else if apiError != nil {
+		t.Logf(formatAPIError, apiError.RetryIndicator, apiError.Type, apiError.Description, apiError.InfoURL)
+		return true
+	} else if gatewayError != nil {
+		t.Logf(formatGatewayError, gatewayError.Error)
+		return true
+	}
+	return false
 }
 
 func TestCountryURLs(t *testing.T) {
@@ -52,7 +66,7 @@ func TestFetchCountries(t *testing.T) {
 	t.Logf("Testing Fetch Countries...\n")
 
 	api := initializeAPI()
-	sleepTime, _ := time.ParseDuration(testdelay)
+	sleepTime, _ := time.ParseDuration(testDelay)
 
 	testParams := []RefParams{
 		{},
@@ -67,28 +81,19 @@ func TestFetchCountries(t *testing.T) {
 	for i, p := range testParams {
 		t.Logf("\nTest %d...\n", i)
 
-		fetched, err := api.FetchCountries(p)
-		if err != nil {
-			t.Errorf("Test %d failed, error: %+v", i, err)
+		fetched, apiError, gatewayError, err := api.FetchCountries(p)
+		if apiFetchTestHasError(t, err, i, apiError, gatewayError) {
+			continue
 		}
 
-		switch val := fetched.(type) {
-		case *CountriesResponse:
-			for _, c := range val.Countries {
-				for _, n := range c.Names {
-					if (n.LanguageCode == "EN" && p.Lang == "") || n.LanguageCode == p.Lang {
-						t.Logf(n.Name)
-					} else if p.Lang != "" {
-						t.Logf("_")
-					}
+		for _, c := range fetched.Countries {
+			for _, n := range c.Names {
+				if (n.LanguageCode == "EN" && p.Lang == "") || n.LanguageCode == p.Lang {
+					t.Logf(n.Name)
+				} else if p.Lang != "" {
+					t.Logf("_")
 				}
 			}
-		case *APIError:
-			t.Logf(formatAPIError, val.RetryIndicator, val.Type, val.Description, val.InfoURL)
-		case *GatewayError:
-			t.Logf(formatGatewayError, val.Error)
-		default:
-			t.Errorf("%+v", val)
 		}
 
 		time.Sleep(sleepTime)
@@ -99,7 +104,7 @@ func TestFetchCities(t *testing.T) {
 	t.Logf("\nTesting Fetch Cities...\n")
 
 	api := initializeAPI()
-	sleepTime, _ := time.ParseDuration(testdelay)
+	sleepTime, _ := time.ParseDuration(testDelay)
 
 	testParams := []RefParams{
 		{},
@@ -114,28 +119,19 @@ func TestFetchCities(t *testing.T) {
 	for i, p := range testParams {
 		t.Logf("\nTest %d...\n", i)
 
-		fetched, err := api.FetchCities(p)
-		if err != nil {
-			t.Errorf("Test %d failed, error: %+v", i, err)
+		fetched, apiError, gatewayError, err := api.FetchCities(p)
+		if apiFetchTestHasError(t, err, i, apiError, gatewayError) {
+			continue
 		}
 
-		switch val := fetched.(type) {
-		case *CitiesResponse:
-			for _, c := range val.Cities {
-				for _, n := range c.Names {
-					if (n.LanguageCode == "EN" && p.Lang == "") || n.LanguageCode == p.Lang {
-						t.Logf(n.Name)
-					} else if p.Lang != "" {
-						t.Logf("_")
-					}
+		for _, c := range fetched.Cities {
+			for _, n := range c.Names {
+				if (n.LanguageCode == "EN" && p.Lang == "") || n.LanguageCode == p.Lang {
+					t.Logf(n.Name)
+				} else if p.Lang != "" {
+					t.Logf("_")
 				}
 			}
-		case *APIError:
-			t.Logf(formatAPIError, val.RetryIndicator, val.Type, val.Description, val.InfoURL)
-		case *GatewayError:
-			t.Logf(formatGatewayError, val.Error)
-		default:
-			t.Errorf("%+v", val)
 		}
 
 		time.Sleep(sleepTime)

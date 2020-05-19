@@ -1,10 +1,4 @@
 {
-  "editor.formatOnSave": true,
-  "editor.useTabStops": true,
-  "editor.tabSize": 2,
-  "files.encoding": "utf8",
-  "files.eol": "\n",
-  "files.insertFinalNewline": true,
   "[go]": {
     "editor.insertSpaces": false,
     "editor.codeActionsOnSave": {
@@ -13,11 +7,11 @@
     "editor.tabSize": 4
   },
   "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.quickSuggestions": {
       "strings": true
     },
-    "editor.suggest.insertMode": "replace",
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.suggest.insertMode": "replace"
   },
   "[jsonc]": {
     "editor.quickSuggestions": {
@@ -26,5 +20,11 @@
     "editor.suggest.insertMode": "replace",
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "editor.useTabStops": true,
+  "files.encoding": "utf8",
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
   "prettier.tabWidth": 2
 }

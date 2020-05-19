@@ -48,22 +48,17 @@ func (p RefParams) ToURL() string {
 	return ret
 }
 
-// FetchCountries requests from the countries reference. Pass parametres as mentioned in
+// FetchCountries requests from the countries reference. Pass parameters as mentioned in
 // the API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Countries.
 //
-// The function returns a pointer to a struct containing the decoded data.
-// You must use type assertion to get the result, as it can be of the following types:
-//  - CountriesResponse
-//  - APIError
-//  - TokenError
-// Assert for all of them in a switch statement.
-//
-// Lufthansa API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Countries
-func (a *API) FetchCountries(p RefParams) (interface{}, error) {
+// The function returns a pointer to the decoded cities response struct. If this is nil, the function
+// will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
+// there is no GatewayError and vice-versa. Check first for errors.
+func (a *API) FetchCountries(p RefParams) (*CountriesResponse, *APIError, *GatewayError, error) {
 	url := fmt.Sprintf("%s/countries/%s", referenceAPI, p.ToURL())
 	res, err := a.fetch(url)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	switch res.StatusCode {
@@ -71,31 +66,27 @@ func (a *API) FetchCountries(p RefParams) (interface{}, error) {
 		ret := &CountriesResponse{}
 		err = xml.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 		res.Body.Close()
-		return ret, nil
+		return ret, nil, nil, nil
 	default:
-		return decodeErrors(res)
+		apiError, gatewayError, err := decodeErrors(res)
+		return nil, apiError, gatewayError, err
 	}
 }
 
-// FetchCities requests from the cities reference. Pass parametres as mentioned in
+// FetchCities requests from the cities reference. Pass parameters as mentioned in
 // the API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Cities.
 //
-// The function returns a pointer to a struct containing the decoded data.
-// You must use type assertion to get the result, as it can be of the following types:
-// - CitiesResponse
-// - APIError
-// - TokenError
-// Assert for all of them in a switch statement.
-//
-// Lufthansa API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Cities
-func (a *API) FetchCities(p RefParams) (interface{}, error) {
+// The function returns a pointer to the decoded cities response struct. If this is nil, the function
+// will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
+// there is no GatewayError and vice-versa. Check first for errors.
+func (a *API) FetchCities(p RefParams) (*CitiesResponse, *APIError, *GatewayError, error) {
 	url := fmt.Sprintf("%s/cities/%s", referenceAPI, p.ToURL())
 	res, err := a.fetch(url)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	switch res.StatusCode {
@@ -103,11 +94,12 @@ func (a *API) FetchCities(p RefParams) (interface{}, error) {
 		ret := &CitiesResponse{}
 		err = xml.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 		res.Body.Close()
-		return ret, nil
+		return ret, nil, nil, nil
 	default:
-		return decodeErrors(res)
+		apiError, gatewayError, err := decodeErrors(res)
+		return nil, apiError, gatewayError, err
 	}
 }

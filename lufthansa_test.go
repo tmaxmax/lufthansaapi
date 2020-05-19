@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	testdelay          string = "200ms"
+	testDelay          string = "200ms"
 	formatAPIError     string = "API Error\nRetryIndicator: %t\nType: %s\nDescription: %s\nInfoURL: %s\n"
 	formatGatewayError string = "Gateway Error: %s\n"
 )
@@ -18,24 +18,26 @@ type TestCountryURLItem struct {
 	Result string
 }
 
-// userAPI is the format an API access information is written in my JSON file
-type userAPI struct {
-	APIName      string `json:"name"`
-	ClientID     string `json:"id"`
-	ClientSecret string `json:"secret"`
-}
-
-// MyAPIs is the format my accessible userAPIs credentials are passed
-type userAPIs struct {
-	APIs []API `json:"apis"`
-}
-
 func initializeAPI() *API {
 	api, err := NewAPI(os.Getenv("LOA_ID"), os.Getenv("LOA_SECRET"))
 	if err != nil {
 		log.Fatalf("API initialization failed: %v\n", err)
 	}
 	return api
+}
+
+func apiFetchTestHasError(t *testing.T, err error, i int, apiError *APIError, gatewayError *GatewayError) bool {
+	if err != nil {
+		t.Errorf("Test %d failed, error: %+v", i, err)
+		return true
+	} else if apiError != nil {
+		t.Logf(formatAPIError, apiError.RetryIndicator, apiError.Type, apiError.Description, apiError.InfoURL)
+		return true
+	} else if gatewayError != nil {
+		t.Logf(formatGatewayError, gatewayError.Error)
+		return true
+	}
+	return false
 }
 
 func TestCountryURLs(t *testing.T) {
@@ -64,9 +66,9 @@ func TestFetchCountries(t *testing.T) {
 	t.Logf("Testing Fetch Countries...\n")
 
 	api := initializeAPI()
-	sleeptime, _ := time.ParseDuration(testdelay)
+	sleepTime, _ := time.ParseDuration(testDelay)
 
-	testparams := []RefParams{
+	testParams := []RefParams{
 		{},
 		{Lang: "EN"},
 		{Code: "DK"},
@@ -76,34 +78,25 @@ func TestFetchCountries(t *testing.T) {
 		{Limit: 50, Offset: 30, Lang: "HR"},
 	}
 
-	for i, p := range testparams {
+	for i, p := range testParams {
 		t.Logf("\nTest %d...\n", i)
 
-		fetched, err := api.FetchCountries(p)
-		if err != nil {
-			t.Errorf("Test %d failed, error: %+v", i, err)
+		fetched, apiError, gatewayError, err := api.FetchCountries(p)
+		if apiFetchTestHasError(t, err, i, apiError, gatewayError) {
+			continue
 		}
 
-		switch val := fetched.(type) {
-		case *CountriesResponse:
-			for _, c := range val.Countries {
-				for _, n := range c.Names {
-					if (n.LanguageCode == "EN" && p.Lang == "") || n.LanguageCode == p.Lang {
-						t.Logf(n.Name)
-					} else if p.Lang != "" {
-						t.Logf("_")
-					}
+		for _, c := range fetched.Countries {
+			for _, n := range c.Names {
+				if (n.LanguageCode == "EN" && p.Lang == "") || n.LanguageCode == p.Lang {
+					t.Logf(n.Name)
+				} else if p.Lang != "" {
+					t.Logf("_")
 				}
 			}
-		case *APIError:
-			t.Logf(formatAPIError, val.RetryIndicator, val.Type, val.Description, val.InfoURL)
-		case *GatewayError:
-			t.Logf(formatGatewayError, val.Error)
-		default:
-			t.Errorf("%+v", val)
 		}
 
-		time.Sleep(sleeptime)
+		time.Sleep(sleepTime)
 	}
 }
 
@@ -111,9 +104,9 @@ func TestFetchCities(t *testing.T) {
 	t.Logf("\nTesting Fetch Cities...\n")
 
 	api := initializeAPI()
-	sleeptime, _ := time.ParseDuration(testdelay)
+	sleepTime, _ := time.ParseDuration(testDelay)
 
-	testparams := []RefParams{
+	testParams := []RefParams{
 		{},
 		{Lang: "EN"},
 		{Code: "NYC"},
@@ -123,33 +116,24 @@ func TestFetchCities(t *testing.T) {
 		{Limit: 9876, Offset: 5432, Lang: "HR"},
 	}
 
-	for i, p := range testparams {
+	for i, p := range testParams {
 		t.Logf("\nTest %d...\n", i)
 
-		fetched, err := api.FetchCities(p)
-		if err != nil {
-			t.Errorf("Test %d failed, error: %+v", i, err)
+		fetched, apiError, gatewayError, err := api.FetchCities(p)
+		if apiFetchTestHasError(t, err, i, apiError, gatewayError) {
+			continue
 		}
 
-		switch val := fetched.(type) {
-		case *CitiesResponse:
-			for _, c := range val.Cities {
-				for _, n := range c.Names {
-					if (n.LanguageCode == "EN" && p.Lang == "") || n.LanguageCode == p.Lang {
-						t.Logf(n.Name)
-					} else if p.Lang != "" {
-						t.Logf("_")
-					}
+		for _, c := range fetched.Cities {
+			for _, n := range c.Names {
+				if (n.LanguageCode == "EN" && p.Lang == "") || n.LanguageCode == p.Lang {
+					t.Logf(n.Name)
+				} else if p.Lang != "" {
+					t.Logf("_")
 				}
 			}
-		case *APIError:
-			t.Logf(formatAPIError, val.RetryIndicator, val.Type, val.Description, val.InfoURL)
-		case *GatewayError:
-			t.Logf(formatGatewayError, val.Error)
-		default:
-			t.Errorf("%+v", val)
 		}
 
-		time.Sleep(sleeptime)
+		time.Sleep(sleepTime)
 	}
 }

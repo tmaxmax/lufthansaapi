@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 )
@@ -27,31 +26,27 @@ func processLimitOffset(l, o int) string {
 	return ret
 }
 
-// decodeErrors unmarshals the API response, according to the HTTP response error
+// decodeErrors decodes the API response, according to the HTTP response error
 // code sent. This functions should be used to decode errors, as they all have the same format.
-func decodeErrors(res *http.Response) (interface{}, error) {
+func decodeErrors(res *http.Response) (*APIError, *GatewayError, error) {
 	defer res.Body.Close()
 
 	switch res.StatusCode {
-	case 400, 402, 404, 405:
+	case 400, 402, 404, 405, 500:
 		ret := &APIError{}
 		err := xml.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return ret, nil
+		return ret, nil, nil
 	case 401, 403:
 		ret := &GatewayError{}
 		err := json.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return ret, nil
+		return nil, ret, nil
 	default:
-		body, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			return nil, err
-		}
-		return string(body), nil
+		return nil, nil, nil
 	}
 }

@@ -8,7 +8,7 @@ type GatewayError struct {
 }
 
 // APIError struct is the object all API errors XML are decoded in.
-// Fields are analoguous to the XML sent. See https://developer.lufthansa.com/docs/read/api_basics/Error_Messages
+// Fields are analogous to the XML sent. See https://developer.lufthansa.com/docs/read/api_basics/Error_Messages
 // for more information.
 type APIError struct {
 	RetryIndicator bool   `xml:"ProcessingError,RetryIndicator,attr"`
@@ -28,18 +28,18 @@ type meta struct {
 	TotalCount int        `xml:"TotalCount"`
 }
 
-type countryName struct {
+type referenceName struct {
 	LanguageCode string `xml:"LanguageCode,attr"`
 	Name         string `xml:",chardata"`
 }
 
 type country struct {
-	CountryCode string        `xml:"CountryCode"`
-	Names       []countryName `xml:"Names>Name"`
+	CountryCode string          `xml:"CountryCode"`
+	Names       []referenceName `xml:"Names>Name"`
 }
 
 // CountriesResponse represents the decoded response returned
-// by FetchCountries API method. It isn't analoguous to the XML
+// by FetchCountries API method. It isn't analogous to the XML
 // tags, to keep the structure simple.
 // Lufthansa API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Countries
 type CountriesResponse struct {
@@ -47,19 +47,14 @@ type CountriesResponse struct {
 	Meta      meta      `xml:"Meta"`
 }
 
-type cityName struct {
-	LanguageCode string `xml:"LanguageCode,attr"`
-	Name         string `xml:",chardata"`
-}
-
 type city struct {
-	CityCode    string     `xml:"CityCode"`
-	CountryCode string     `xml:"CountryCode"`
-	Names       []cityName `xml:"Names>Name"`
+	CityCode    string          `xml:"CityCode"`
+	CountryCode string          `xml:"CountryCode"`
+	Names       []referenceName `xml:"Names>Name"`
 }
 
 // CitiesResponse represents the decoded API response returned
-// by FetchCities method. It isn't analoguous to the XML tags, to keep the structure simple.
+// by FetchCities method. It isn't analogous to the XML tags, to keep the structure simple.
 // Lufthansa API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Cities
 type CitiesResponse struct {
 	Cities []city `xml:"Cities>City"`

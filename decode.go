@@ -12,41 +12,61 @@ import (
 // which are available for most of the API requests, into an usable string
 // for creating the API request URL.
 func processLimitOffset(l, o int) string {
-	var ret string
+	var ret strings.Builder
 	if l != 0 {
-		ret += fmt.Sprintf("limit=%d", l)
+		ret.WriteString(fmt.Sprintf("limit=%d", l))
 	}
 	if o != 0 {
-		if strings.Contains(ret, "limit") {
-			ret += fmt.Sprintf("&offset=%d", o)
+		if strings.Contains(ret.String(), "limit") {
+			ret.WriteString(fmt.Sprintf("&offset=%d", o))
 		} else {
-			ret += fmt.Sprintf("offset=%d", o)
+			ret.WriteString(fmt.Sprintf("offset=%d", o))
 		}
 	}
-	return ret
+	return ret.String()
 }
 
 // decodeErrors decodes the API response, according to the HTTP response error
 // code sent. This functions should be used to decode errors, as they all have the same format.
-func decodeErrors(res *http.Response) (*APIError, *GatewayError, error) {
+func decodeErrors(res *http.Response) (interface{}, error) {
 	defer res.Body.Close()
 
 	switch res.StatusCode {
-	case 400, 402, 404, 405, 500:
+	case 400:
+		ret := &BadRequestError{}
+		err := xml.NewDecoder(res.Body).Decode(ret)
+		if err != nil {
+			return nil, err
+		}
+		return ret, nil
+	case 402, 404, 405:
 		ret := &APIError{}
 		err := xml.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		return ret, nil, nil
+		return ret, nil
 	case 401, 403:
 		ret := &GatewayError{}
 		err := json.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		return nil, ret, nil
+		return ret, nil
+	case 500:
+		ret := &jsonAPIError{}
+		err := json.NewDecoder(res.Body).Decode(ret)
+		if err != nil {
+			return nil, err
+		}
+		return &APIError{
+			RetryIndicator: ret.ProcessingErrors.ProcessingError.RetryIndicator,
+			Type:           ret.ProcessingErrors.ProcessingError.Type,
+			Code:           ret.ProcessingErrors.ProcessingError.Code,
+			Description:    ret.ProcessingErrors.ProcessingError.Description,
+			InfoURL:        ret.ProcessingErrors.ProcessingError.InfoURL,
+		}, nil
 	default:
-		return nil, nil, nil
+		return nil, nil
 	}
 }

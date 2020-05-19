@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	testDelay          string = "200ms"
-	formatAPIError     string = "API Error\nRetryIndicator: %t\nType: %s\nDescription: %s\nInfoURL: %s\n"
-	formatGatewayError string = "Gateway Error: %s\n"
+	testDelay             string = "200ms"
+	formatAPIError        string = "\nAPI Error\nRetryIndicator: %t\nType: %s\nDescription: %s\nInfoURL: %s\n"
+	formatGatewayError    string = "\nGateway Error: %s\n"
+	formatBadRequestError string = "\nBad Request Error\nCategory: %s\nWhat: %s\n"
 )
 
 type TestCountryURLItem struct {
@@ -26,18 +27,22 @@ func initializeAPI() *API {
 	return api
 }
 
-func apiFetchTestHasError(t *testing.T, err error, i int, apiError *APIError, gatewayError *GatewayError) bool {
+func apiFetchTestHasError(t *testing.T, err error, i int, aerr interface{}) bool {
 	if err != nil {
 		t.Errorf("Test %d failed, error: %+v", i, err)
 		return true
-	} else if apiError != nil {
-		t.Logf(formatAPIError, apiError.RetryIndicator, apiError.Type, apiError.Description, apiError.InfoURL)
-		return true
-	} else if gatewayError != nil {
-		t.Logf(formatGatewayError, gatewayError.Error)
-		return true
 	}
-	return false
+	switch v := aerr.(type) {
+	case *APIError:
+		t.Logf(formatAPIError, v.RetryIndicator, v.Type, v.Description, v.InfoURL)
+	case *GatewayError:
+		t.Logf(formatGatewayError, v.Error)
+	case *BadRequestError:
+		t.Logf(formatBadRequestError, v.Category, v.Text)
+	default:
+		return false
+	}
+	return true
 }
 
 func TestCountryURLs(t *testing.T) {
@@ -81,8 +86,8 @@ func TestAPI_FetchCountries(t *testing.T) {
 	for i, p := range testParams {
 		t.Logf("\nTest %d...\n", i)
 
-		fetched, apiError, gatewayError, err := api.FetchCountries(p)
-		if apiFetchTestHasError(t, err, i, apiError, gatewayError) {
+		fetched, aerr, err := api.FetchCountries(p)
+		if apiFetchTestHasError(t, err, i, aerr) {
 			continue
 		}
 
@@ -119,8 +124,8 @@ func TestAPI_FetchCities(t *testing.T) {
 	for i, p := range testParams {
 		t.Logf("\nTest %d...\n", i)
 
-		fetched, apiError, gatewayError, err := api.FetchCities(p)
-		if apiFetchTestHasError(t, err, i, apiError, gatewayError) {
+		fetched, aerr, err := api.FetchCities(p)
+		if apiFetchTestHasError(t, err, i, aerr) {
 			continue
 		}
 
@@ -161,15 +166,14 @@ func TestAPI_FetchAirports(t *testing.T) {
 	for i, p := range testParams {
 		t.Logf("\nTest %d...\n", i)
 
-		fetched, apiError, gatewayError, err := api.FetchAirports(p.Ref, p.LHop)
-		if apiFetchTestHasError(t, err, i, apiError, gatewayError) {
+		fetched, aerr, err := api.FetchAirports(p.Ref, p.LHop)
+		if apiFetchTestHasError(t, err, i, aerr) {
 			continue
 		}
 
 		for _, a := range fetched.Airports {
 			var j int
 			for ; j < len(a.Names) && a.Names[j].LanguageCode != p.Ref.Lang; j++ {
-				continue
 			}
 			if j == len(a.Names) {
 				for j = 0; j < len(a.Names) && a.Names[j].LanguageCode != "EN"; j++ {
@@ -181,3 +185,52 @@ func TestAPI_FetchAirports(t *testing.T) {
 		time.Sleep(sleepTime)
 	}
 }
+
+type TestFetchNearestAirportsItem struct {
+	Lat, Long float32
+	LangCode  string
+}
+
+func TestAPI_FetchNearestAirports(t *testing.T) {
+	t.Logf("\nTesting Fetch Nearest Airports...\n")
+
+	api := initializeAPI()
+	sleepTime, _ := time.ParseDuration(testDelay)
+
+	testParams := []TestFetchNearestAirportsItem{
+		{Lat: 51.507351, Long: -0.127758, LangCode: "EN"},
+		{Lat: 51.540, Long: 5.935, LangCode: "DE"},
+		{Lat: 36.562, Long: -115.596},
+		{Lat: 44.435581, Long: 26.102221},
+	}
+
+	for i, p := range testParams {
+		t.Logf("\nTest %d...\n", i)
+
+		fetched, aerr, err := api.FetchNearestAirports(p.Lat, p.Long, p.LangCode)
+		if apiFetchTestHasError(t, err, i, aerr) {
+			continue
+		}
+
+		for _, na := range fetched.Airports {
+			var j int
+			for ; j < len(na.Names) && na.Names[j].LanguageCode != p.LangCode; j++ {
+			}
+			if j == len(na.Names) {
+				for j = 0; j < len(na.Names) && na.Names[j].LanguageCode != "EN"; j++ {
+					t.Logf("%s ", na.Names[j].LanguageCode)
+				}
+			}
+			t.Logf(`
+Airport code: %s
+Airport name: %s (%s)
+Airport position: lat %f, long %f
+Airport distance: %d%s
+`, na.AirportCode, na.Names[j].Name, na.Names[j].LanguageCode, na.Position.Latitude, na.Position.Longitude, na.Distance.Value, na.Distance.UnitOfMeasure)
+		}
+
+		time.Sleep(sleepTime)
+	}
+}
+
+// TODO: Create tests for FetchAirlines and FetchAircraft

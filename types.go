@@ -1,6 +1,11 @@
 package lufthansa
 
 type (
+	// BadRequestError is the type of error returned on HTTP status response code 400
+	BadRequestError struct {
+		Category string `xml:"category"`
+		Text     string `xml:"text"`
+	}
 	// GatewayError struct is the object that JSON is decoded in when
 	// the status response from the request is 401, which means the token
 	// is invalid or missing.
@@ -13,8 +18,23 @@ type (
 	APIError struct {
 		RetryIndicator bool   `xml:"ProcessingError,RetryIndicator,attr"`
 		Type           string `xml:"ProcessingError>Type"`
+		Code           string `xml:"ProcessingError>Code"`
 		Description    string `xml:"ProcessingError>Description"`
 		InfoURL        string `xml:"ProcessingError>InfoURL"`
+	}
+
+	jsonProcessingError struct {
+		RetryIndicator bool   `json:"@RetryIndicator"`
+		Type           string `json:"Type"`
+		Code           string `json:"Code"`
+		Description    string `json:"Description"`
+		InfoURL        string `json:"InfoURL"`
+	}
+
+	jsonAPIError struct {
+		ProcessingErrors struct {
+			ProcessingError jsonProcessingError `json:"ProcessingError"`
+		} `json:"ProcessingErrors"`
 	}
 )
 
@@ -87,5 +107,59 @@ type (
 	AirportsReference struct {
 		Airports []airport `xml:"Airports>Airport"`
 		Meta     []meta    `xml:"Meta"`
+	}
+
+	nearestAirportDistance struct {
+		Value         int    `xml:"Value"`
+		UnitOfMeasure string `xml:"UOM"`
+	}
+	nearestAirport struct {
+		AirportCode  string                 `xml:"AirportCode"`
+		Position     airportPosition        `xml:"Position"`
+		CityCode     string                 `xml:"CityCode"`
+		CountryCode  string                 `xml:"CountryCode"`
+		LocationType string                 `xml:"LocationType"`
+		Names        []referenceName        `xml:"Names>Name"`
+		Distance     nearestAirportDistance `xml:"Distance"`
+	}
+	// NearestAirportsReference represents the decoded API response returned
+	// by FetchNearestAirports method. It isn't analogous to the XML tags, to keep the structure simple.
+	// Lufthansa API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Nearest_Airport
+	NearestAirportsReference struct {
+		Airports []nearestAirport `xml:"Airports>Airport"`
+		Meta     []meta           `xml:"Meta"`
+	}
+)
+
+type (
+	airlineID struct {
+		IATA string `xml:"AirlineID"`
+		ICAO string `xml:"AirlineID_ICAO"`
+	}
+	airline struct {
+		ID    airlineID
+		Names []referenceName `xml:"Names>Name"`
+	}
+	// NearestAirportsReference represents the decoded API response returned
+	// by FetchAirlines method. It isn't analogous to the XML tags, to keep the structure simple.
+	// Lufthansa API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Airlines
+	AirlinesReference struct {
+		Airlines []airline `xml:"Airlines>Airline"`
+		Meta     []meta    `xml:"Meta"`
+	}
+)
+
+type (
+	aircraft struct {
+		AircraftCode     string          `xml:"AircraftCode"`
+		Names            []referenceName `xml:"Names>Name"`
+		AirlineEquipCode string          `xml:"AirlineEquipCode"`
+	}
+	// AircraftReference represents the decoded API response returned
+	// by FetchAircraft method. It isn't analogous to the XML tags, to keep the structure simple.
+	// Lufthansa API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Aircraft
+	AircraftReference struct {
+		AircraftSummaries []aircraft `xml:"AircraftSummaries>AircraftSummary"`
+		Meta              []meta     `xml:"Meta"`
 	}
 )

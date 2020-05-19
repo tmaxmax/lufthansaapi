@@ -54,7 +54,7 @@ func (p RefParams) ToURL() string {
 // The function returns a pointer to the decoded cities response struct. If this is nil, the function
 // will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
 // there is no GatewayError and vice-versa. Check first for errors.
-func (a *API) FetchCountries(p RefParams) (*CountriesResponse, *APIError, *GatewayError, error) {
+func (a *API) FetchCountries(p RefParams) (*CountriesReference, *APIError, *GatewayError, error) {
 	url := fmt.Sprintf("%s/countries/%s", referenceAPI, p.ToURL())
 	res, err := a.fetch(url)
 	if err != nil {
@@ -63,7 +63,7 @@ func (a *API) FetchCountries(p RefParams) (*CountriesResponse, *APIError, *Gatew
 
 	switch res.StatusCode {
 	case 200:
-		ret := &CountriesResponse{}
+		ret := &CountriesReference{}
 		err = xml.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
 			return nil, nil, nil, err
@@ -82,7 +82,7 @@ func (a *API) FetchCountries(p RefParams) (*CountriesResponse, *APIError, *Gatew
 // The function returns a pointer to the decoded cities response struct. If this is nil, the function
 // will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
 // there is no GatewayError and vice-versa. Check first for errors.
-func (a *API) FetchCities(p RefParams) (*CitiesResponse, *APIError, *GatewayError, error) {
+func (a *API) FetchCities(p RefParams) (*CitiesReference, *APIError, *GatewayError, error) {
 	url := fmt.Sprintf("%s/cities/%s", referenceAPI, p.ToURL())
 	res, err := a.fetch(url)
 	if err != nil {
@@ -91,7 +91,41 @@ func (a *API) FetchCities(p RefParams) (*CitiesResponse, *APIError, *GatewayErro
 
 	switch res.StatusCode {
 	case 200:
-		ret := &CitiesResponse{}
+		ret := &CitiesReference{}
+		err = xml.NewDecoder(res.Body).Decode(ret)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		res.Body.Close()
+		return ret, nil, nil, nil
+	default:
+		apiError, gatewayError, err := decodeErrors(res)
+		return nil, apiError, gatewayError, err
+	}
+}
+
+// FetchAirports requests from the airports reference. Pass parameters as mentioned in
+// the API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Airports.
+//
+// The function returns a pointer to the decoded cities response struct. If this is nil, the function
+// will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
+// there is no GatewayError and vice-versa. Check first for errors.
+func (a *API) FetchAirports(p RefParams, LHOperated bool) (*AirportsReference, *APIError, *GatewayError, error) {
+	url := fmt.Sprintf("%s/airports/%s", referenceAPI, p.ToURL())
+	if strings.Contains(url, "?") {
+		url += fmt.Sprintf("&LHoperated=%t", LHOperated)
+	} else {
+		url += fmt.Sprintf("?LHoperated=%t", LHOperated)
+	}
+
+	res, err := a.fetch(url)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	switch res.StatusCode {
+	case 200:
+		ret := &AirportsReference{}
 		err = xml.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
 			return nil, nil, nil, err

@@ -42,13 +42,13 @@ func apiFetchTestHasError(t *testing.T, err error, i int, apiError *APIError, ga
 
 func TestCountryURLs(t *testing.T) {
 	tests := []TestCountryURLItem{
-		{RefParams{}, ""},
-		{RefParams{Lang: "EN"}, "?lang=EN"},
-		{RefParams{Code: "DK"}, "DK"},
-		{RefParams{Lang: "EN", Code: "DK"}, "DK?lang=EN"},
-		{RefParams{Limit: 20}, "?limit=20"},
-		{RefParams{Limit: 20, Offset: 1}, "?limit=20&offset=1"},
-		{RefParams{Lang: "EN", Limit: 20, Offset: 1}, "?lang=EN&limit=20&offset=1"},
+		{},
+		{RefP: RefParams{Lang: "EN"}, Result: "?lang=EN"},
+		{RefP: RefParams{Code: "DK"}, Result: "DK"},
+		{RefP: RefParams{Lang: "EN", Code: "DK"}, Result: "DK?lang=EN"},
+		{RefP: RefParams{Limit: 20}, Result: "?limit=20"},
+		{RefP: RefParams{Limit: 20, Offset: 1}, Result: "?limit=20&offset=1"},
+		{RefP: RefParams{Lang: "EN", Limit: 20, Offset: 1}, Result: "?lang=EN&limit=20&offset=1"},
 	}
 
 	t.Logf("Testing Country URLs...\n")
@@ -62,7 +62,7 @@ func TestCountryURLs(t *testing.T) {
 	}
 }
 
-func TestFetchCountries(t *testing.T) {
+func TestAPI_FetchCountries(t *testing.T) {
 	t.Logf("Testing Fetch Countries...\n")
 
 	api := initializeAPI()
@@ -100,7 +100,7 @@ func TestFetchCountries(t *testing.T) {
 	}
 }
 
-func TestFetchCities(t *testing.T) {
+func TestAPI_FetchCities(t *testing.T) {
 	t.Logf("\nTesting Fetch Cities...\n")
 
 	api := initializeAPI()
@@ -132,6 +132,50 @@ func TestFetchCities(t *testing.T) {
 					t.Logf("_")
 				}
 			}
+		}
+
+		time.Sleep(sleepTime)
+	}
+}
+
+type TestFetchAirplanesItem struct {
+	Ref  RefParams
+	LHop bool
+}
+
+func TestAPI_FetchAirports(t *testing.T) {
+	t.Logf("\nTesting Fetch Airports...\n")
+
+	api := initializeAPI()
+	sleepTime, _ := time.ParseDuration(testDelay)
+
+	testParams := []TestFetchAirplanesItem{
+		{},
+		{Ref: RefParams{Lang: "EN"}, LHop: true},
+		{Ref: RefParams{Limit: 40, Offset: 100}},
+		{Ref: RefParams{Limit: 11640}},
+		{Ref: RefParams{Offset: 11700}},
+		{Ref: RefParams{Lang: "DE", Limit: 200, Offset: 400}, LHop: true},
+	}
+
+	for i, p := range testParams {
+		t.Logf("\nTest %d...\n", i)
+
+		fetched, apiError, gatewayError, err := api.FetchAirports(p.Ref, p.LHop)
+		if apiFetchTestHasError(t, err, i, apiError, gatewayError) {
+			continue
+		}
+
+		for _, a := range fetched.Airports {
+			var j int
+			for ; j < len(a.Names) && a.Names[j].LanguageCode != p.Ref.Lang; j++ {
+				continue
+			}
+			if j == len(a.Names) {
+				for j = 0; j < len(a.Names) && a.Names[j].LanguageCode != "EN"; j++ {
+				}
+			}
+			t.Logf("\nAirport code: %s\nAirport name: %s (%s)\nAirport position: lat %f, long %f\n\n", a.AirportCode, a.Names[j].Name, a.Names[j].LanguageCode, a.Position.Latitude, a.Position.Longitude)
 		}
 
 		time.Sleep(sleepTime)

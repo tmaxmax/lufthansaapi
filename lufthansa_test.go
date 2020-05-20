@@ -188,7 +188,7 @@ func TestAPI_FetchAirports(t *testing.T) {
 
 type TestFetchNearestAirportsItem struct {
 	Lat, Long float32
-	LangCode  string
+	LangCode  ReferenceLangCode
 }
 
 func TestAPI_FetchNearestAirports(t *testing.T) {
@@ -217,15 +217,14 @@ func TestAPI_FetchNearestAirports(t *testing.T) {
 			for ; j < len(na.Names) && na.Names[j].LanguageCode != p.LangCode; j++ {
 			}
 			if j == len(na.Names) {
-				for j = 0; j < len(na.Names) && na.Names[j].LanguageCode != "EN"; j++ {
-					t.Logf("%s ", na.Names[j].LanguageCode)
-				}
+				j = 0
 			}
 			t.Logf(`
 Airport code: %s
 Airport name: %s (%s)
 Airport position: lat %f, long %f
 Airport distance: %d%s
+
 `, na.AirportCode, na.Names[j].Name, na.Names[j].LanguageCode, na.Position.Latitude, na.Position.Longitude, na.Distance.Value, na.Distance.UnitOfMeasure)
 		}
 
@@ -233,4 +232,70 @@ Airport distance: %d%s
 	}
 }
 
-// TODO: Create tests for FetchAirlines and FetchAircraft
+func TestAPI_FetchAirlines(t *testing.T) {
+	t.Logf("\nTesting Fetch Airlines...\n")
+
+	api := initializeAPI()
+	sleepTime, _ := time.ParseDuration(testDelay)
+
+	testParams := []RefParams{
+		{},
+		{Code: "TXL"},
+		{Limit: 50},
+		{Limit: 30, Offset: 200},
+		{Offset: 1150},
+	}
+
+	for i, p := range testParams {
+		t.Logf("\nTest %d...\n", i)
+
+		fetched, aerr, err := api.FetchAirlines(p)
+		if apiFetchTestHasError(t, err, i, aerr) {
+			continue
+		}
+
+		for _, a := range fetched.Airlines {
+			t.Logf(`
+Airline IDs: IATA %s, ICAO %s
+Airline Name: %s (%s)
+
+`, a.IATA, a.ICAO, a.Names[0].Name, a.Names[0].LanguageCode)
+		}
+
+		time.Sleep(sleepTime)
+	}
+}
+
+func TestAPI_FetchAircraft(t *testing.T) {
+	t.Logf("\nTesting Fetch Aircraft...\n")
+
+	api := initializeAPI()
+	sleepTime, _ := time.ParseDuration(testDelay)
+
+	testParams := []RefParams{
+		{},
+		{Code: "70M"},
+		{Code: "sarmale"},
+		{Limit: 50},
+		{Limit: 100, Offset: 200},
+		{Offset: 370},
+	}
+
+	for i, p := range testParams {
+		fetched, aerr, err := api.FetchAircraft(p)
+		if apiFetchTestHasError(t, err, i, aerr) {
+			continue
+		}
+
+		for _, a := range fetched.AircraftSummaries {
+			t.Logf(`
+Aircraft Code: %s
+Aircraft Name: %s (%s)
+Airline Equipment Code: %s
+
+`, a.AircraftCode, a.Names[0].Name, a.Names[0].LanguageCode, a.AirlineEquipCode)
+		}
+
+		time.Sleep(sleepTime)
+	}
+}

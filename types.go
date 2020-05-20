@@ -1,5 +1,10 @@
 package lufthansa
 
+import (
+	"encoding/xml"
+	"strings"
+)
+
 type (
 	// BadRequestError is the type of error returned on HTTP status response code 400
 	BadRequestError struct {
@@ -38,9 +43,16 @@ type (
 	}
 )
 
+type ReferenceLangCode string
+
+func (r *ReferenceLangCode) UnmarshalXMLAttr(attr xml.Attr) error {
+	*r = ReferenceLangCode(strings.ToUpper(attr.Value))
+	return nil
+}
+
 type referenceName struct {
-	LanguageCode string `xml:"LanguageCode,attr"`
-	Name         string `xml:",chardata"`
+	LanguageCode ReferenceLangCode `xml:"LanguageCode,attr"`
+	Name         string            `xml:",chardata"`
 }
 
 // reference meta types
@@ -132,12 +144,9 @@ type (
 )
 
 type (
-	airlineID struct {
-		IATA string `xml:"AirlineID"`
-		ICAO string `xml:"AirlineID_ICAO"`
-	}
 	airline struct {
-		ID    airlineID
+		IATA  string          `xml:"AirlineID"`
+		ICAO  string          `xml:"AirlineID_ICAO"`
 		Names []referenceName `xml:"Names>Name"`
 	}
 	// NearestAirportsReference represents the decoded API response returned

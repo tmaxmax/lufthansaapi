@@ -26,7 +26,7 @@ const (
 //    country no. 20 to country no. 119 (100 countries).
 type RefParams struct {
 	Code   string
-	Lang   string
+	Lang   ReferenceLangCode
 	Limit  int
 	Offset int
 }
@@ -146,10 +146,10 @@ func (a *API) FetchAirports(p RefParams, LHOperated bool) (*AirportsReference, i
 // The function returns a pointer to the decoded cities response struct. If this is nil, the function
 // will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
 // there is no GatewayError and vice-versa. Check first for errors.
-func (a *API) FetchNearestAirports(lat, long float32, langCode string) (*NearestAirportsReference, interface{}, error) {
+func (a *API) FetchNearestAirports(lat, long float32, langCode ReferenceLangCode) (*NearestAirportsReference, interface{}, error) {
 	url := fmt.Sprintf("%s/airports/nearest/%.3f,%.3f", referenceAPI, lat, long)
 	if langCode != "" {
-		url += fmt.Sprintf("?%s", langCode)
+		url += fmt.Sprintf("?lang=%s", langCode)
 	}
 
 	res, err := a.fetch(url)

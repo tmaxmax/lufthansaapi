@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	referenceAPI string = fetchAPI + "/mds-references"
+	mdsReferenceAPI string = fetchAPI + "/mds-references"
+	referenceAPI    string = fetchAPI + "/references"
 )
 
 // RefParams is a struct containing the parameters
@@ -25,7 +26,7 @@ const (
 //    country no. 20 to country no. 119 (100 countries).
 type RefParams struct {
 	Code   string
-	Lang   string
+	Lang   ReferenceLangCode
 	Limit  int
 	Offset int
 }
@@ -33,81 +34,204 @@ type RefParams struct {
 // ToURL transforms a CountriesParams struct into an URL usable format,
 // so that it can be concatenated to te Request API URL.
 func (p RefParams) ToURL() string {
-	var ret string
+	var ret strings.Builder
 	if p.Code != "" {
-		ret += p.Code
+		ret.WriteString(p.Code)
 	}
 	if p.Lang != "" {
-		ret += "?lang=" + p.Lang
+		ret.WriteString(fmt.Sprintf("?lang=%s", p.Lang))
 	}
-	if lo := processLimitOffset(p.Limit, p.Offset); lo != "" && strings.Contains(ret, "?") {
-		ret += "&" + lo
+	if lo := processLimitOffset(p.Limit, p.Offset); lo != "" && strings.Contains(ret.String(), "?") {
+		ret.WriteString(fmt.Sprintf("&%s", lo))
 	} else if lo != "" {
-		ret += "?" + lo
+		ret.WriteString(fmt.Sprintf("?%s", lo))
 	}
-	return ret
+	return ret.String()
 }
 
-// FetchCountries requests from the countries reference. Pass parametres as mentioned in
+// FetchCountries requests from the countries reference. Pass parameters as mentioned in
 // the API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Countries.
 //
-// The function returns a pointer to a struct containing the decoded data.
-// You must use type assertion to get the result, as it can be of the following types:
-//  - CountriesResponse
-//  - APIError
-//  - TokenError
-// Assert for all of them in a switch statement.
-//
-// Lufthansa API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Countries
-func (a *API) FetchCountries(p RefParams) (interface{}, error) {
-	url := fmt.Sprintf("%s/countries/%s", referenceAPI, p.ToURL())
+// The function returns a pointer to the decoded cities response struct. If this is nil, the function
+// will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
+// there is no GatewayError and vice-versa. Check first for errors.
+func (a *API) FetchCountries(p RefParams) (*CountriesReference, interface{}, error) {
+	url := fmt.Sprintf("%s/countries/%s", mdsReferenceAPI, p.ToURL())
 	res, err := a.fetch(url)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	switch res.StatusCode {
 	case 200:
-		ret := &CountriesResponse{}
+		ret := &CountriesReference{}
 		err = xml.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		res.Body.Close()
-		return ret, nil
+		return ret, nil, nil
 	default:
-		return decodeErrors(res)
+		apiErr, err := decodeErrors(res)
+		return nil, apiErr, err
 	}
 }
 
-// FetchCities requests from the cities reference. Pass parametres as mentioned in
+// FetchCities requests from the cities reference. Pass parameters as mentioned in
 // the API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Cities.
 //
-// The function returns a pointer to a struct containing the decoded data.
-// You must use type assertion to get the result, as it can be of the following types:
-// - CitiesResponse
-// - APIError
-// - TokenError
-// Assert for all of them in a switch statement.
-//
-// Lufthansa API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Cities
-func (a *API) FetchCities(p RefParams) (interface{}, error) {
-	url := fmt.Sprintf("%s/cities/%s", referenceAPI, p.ToURL())
+// The function returns a pointer to the decoded cities response struct. If this is nil, the function
+// will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
+// there is no GatewayError and vice-versa. Check first for errors.
+func (a *API) FetchCities(p RefParams) (*CitiesReference, interface{}, error) {
+	url := fmt.Sprintf("%s/cities/%s", mdsReferenceAPI, p.ToURL())
 	res, err := a.fetch(url)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	switch res.StatusCode {
 	case 200:
-		ret := &CitiesResponse{}
+		ret := &CitiesReference{}
 		err = xml.NewDecoder(res.Body).Decode(ret)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		res.Body.Close()
-		return ret, nil
+		return ret, nil, nil
 	default:
-		return decodeErrors(res)
+		apiErr, err := decodeErrors(res)
+		return nil, apiErr, err
+	}
+}
+
+// FetchAirports requests from the airports reference. Pass parameters as mentioned in
+// the API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Airports.
+//
+// The function returns a pointer to the decoded cities response struct. If this is nil, the function
+// will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
+// there is no GatewayError and vice-versa. Check first for errors.
+func (a *API) FetchAirports(p RefParams, LHOperated bool) (*AirportsReference, interface{}, error) {
+	url := strings.Builder{}
+	url.WriteString(fmt.Sprintf("%s/airports/%s", mdsReferenceAPI, p.ToURL()))
+	if strings.Contains(url.String(), "?") {
+		url.WriteString(fmt.Sprintf("&LHoperated=%t", LHOperated))
+	} else {
+		url.WriteString(fmt.Sprintf("?LHoperated=%t", LHOperated))
+	}
+
+	res, err := a.fetch(url.String())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	switch res.StatusCode {
+	case 200:
+		ret := &AirportsReference{}
+		err = xml.NewDecoder(res.Body).Decode(ret)
+		if err != nil {
+			return nil, nil, err
+		}
+		res.Body.Close()
+		return ret, nil, nil
+	default:
+		apiErr, err := decodeErrors(res)
+		return nil, apiErr, err
+	}
+}
+
+// FetchNearestAirports requests from the airports reference. Pass parameters as mentioned in
+// the API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Nearest_Airport.
+//
+// The function returns a pointer to the decoded cities response struct. If this is nil, the function
+// will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
+// there is no GatewayError and vice-versa. Check first for errors.
+func (a *API) FetchNearestAirports(lat, long float32, langCode ReferenceLangCode) (*NearestAirportsReference, interface{}, error) {
+	url := fmt.Sprintf("%s/airports/nearest/%.3f,%.3f", referenceAPI, lat, long)
+	if langCode != "" {
+		url += fmt.Sprintf("?lang=%s", langCode)
+	}
+
+	res, err := a.fetch(url)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	switch res.StatusCode {
+	case 200:
+		ret := &NearestAirportsReference{}
+		err = xml.NewDecoder(res.Body).Decode(ret)
+		if err != nil {
+			return nil, nil, err
+		}
+		res.Body.Close()
+		return ret, nil, nil
+	default:
+		apiErr, err := decodeErrors(res)
+		return nil, apiErr, err
+	}
+}
+
+// FetchAirlines requests from the airlines reference. Pass parameters as mentioned in
+// the API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Nearest_Airport.
+// Note that RefParam's field Lang is ignored!
+//
+// The function returns a pointer to the decoded cities response struct. If this is nil, the function
+// will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
+// there is no GatewayError and vice-versa. Check first for errors.
+func (a *API) FetchAirlines(p RefParams) (*AirlinesReference, interface{}, error) {
+	if p.Lang != "" {
+		p.Lang = ""
+	}
+	url := fmt.Sprintf("%s/airlines/%s", mdsReferenceAPI, p.ToURL())
+	res, err := a.fetch(url)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	switch res.StatusCode {
+	case 200:
+		ret := &AirlinesReference{}
+		err = xml.NewDecoder(res.Body).Decode(ret)
+		if err != nil {
+			return nil, nil, err
+		}
+		res.Body.Close()
+		return ret, nil, nil
+	default:
+		apiErr, err := decodeErrors(res)
+		return nil, apiErr, err
+	}
+}
+
+// FetchAircraft requests from the aircraft reference. Pass parameters as mentioned in
+// the API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Aircraft.
+// Note that RefParam's field Lang is ignored!
+//
+// The function returns a pointer to the decoded cities response struct. If this is nil, the function
+// will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
+// there is no GatewayError and vice-versa. Check first for errors.
+func (a *API) FetchAircraft(p RefParams) (*AircraftReference, interface{}, error) {
+	if p.Lang != "" {
+		p.Lang = ""
+	}
+	url := fmt.Sprintf("%s/aircraft/%s", mdsReferenceAPI, p.ToURL())
+	res, err := a.fetch(url)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	switch res.StatusCode {
+	case 200:
+		ret := &AircraftReference{}
+		err = xml.NewDecoder(res.Body).Decode(ret)
+		if err != nil {
+			return nil, nil, err
+		}
+		res.Body.Close()
+		return ret, nil, nil
+	default:
+		apiErr, err := decodeErrors(res)
+		return nil, apiErr, err
 	}
 }

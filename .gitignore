@@ -1,1 +1,4 @@
 launch.json
+.env
+.idea
+.curl

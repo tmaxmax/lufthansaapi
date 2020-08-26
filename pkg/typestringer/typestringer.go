@@ -63,7 +63,7 @@ func NewStringifier(opts ...Option) *Stringifier {
 		mapSeparator:    " - ",
 		chanPrefix:      "<-",
 		indexGen: func(i int) string {
-			return "[" + strconv.Itoa(i) + "]"
+			return "[" + strconv.Itoa(i) + "]: "
 		},
 	}
 
@@ -80,17 +80,20 @@ func NewStringifier(opts ...Option) *Stringifier {
 func (s *Stringifier) Stringify(v interface{}, prefix string) string {
 	sb := &strings.Builder{}
 
-	s.stringify(sb, reflect.ValueOf(v), prefix, true)
+	s.stringify(sb, reflect.ValueOf(v), prefix, true, 1)
 	return sb.String()
 }
 
-func (s *Stringifier) stringify(sb *strings.Builder, value reflect.Value, prefix string, writeFirstPrefix bool) {
+func (s *Stringifier) stringify(sb *strings.Builder, value reflect.Value, prefix string, writeFirstPrefix bool, recursionDepth int) {
 	stringer, ok := value.Interface().(fmt.Stringer)
-	if ok {
-		if writeFirstPrefix {
-			sb.WriteString(prefix)
+	if ok && recursionDepth > 1 {
+		lines := strings.Split(stringer.String(), "\n")
+		for i := range lines {
+			if i > 0 || writeFirstPrefix {
+				sb.WriteString(prefix)
+			}
+			sb.WriteString(lines[i])
 		}
-		sb.WriteString(stringer.String())
 		return
 	}
 	switch value.Kind() {
@@ -102,7 +105,7 @@ func (s *Stringifier) stringify(sb *strings.Builder, value reflect.Value, prefix
 			sb.WriteString("nil")
 			return
 		}
-		s.stringify(sb, value.Elem(), prefix, writeFirstPrefix)
+		s.stringify(sb, value.Elem(), prefix, writeFirstPrefix, recursionDepth+1)
 	case reflect.Array, reflect.Slice:
 		if value.IsZero() {
 			if writeFirstPrefix {
@@ -118,7 +121,7 @@ func (s *Stringifier) stringify(sb *strings.Builder, value reflect.Value, prefix
 			indexStr := s.indexGen(i)
 			sb.WriteString(indexStr)
 			v := value.Index(i)
-			s.stringify(sb, v, prefix+genIndent(len(indexStr)), false)
+			s.stringify(sb, v, prefix+genIndent(len(indexStr)), false, recursionDepth+1)
 			if i < l-1 {
 				sb.WriteByte('\n')
 			}
@@ -132,13 +135,13 @@ func (s *Stringifier) stringify(sb *strings.Builder, value reflect.Value, prefix
 		}
 		l := len(value.MapKeys())
 		for i, j := value.MapRange(), 0; i.Next(); j++ {
-			s.stringify(sb, i.Key(), prefix, true)
+			s.stringify(sb, i.Key(), prefix, true, recursionDepth+1)
 			sb.WriteString(s.mapSeparator)
 			v := i.Value()
 			if mustWriteNewlineBefore(v) {
 				sb.WriteByte('\n')
 			}
-			s.stringify(sb, v, prefix+s.indent, false)
+			s.stringify(sb, v, prefix+s.indent, false, recursionDepth+1)
 			if j < l-1 {
 				sb.WriteByte('\n')
 			}
@@ -168,7 +171,7 @@ func (s *Stringifier) stringify(sb *strings.Builder, value reflect.Value, prefix
 				sb.WriteByte('\n')
 				wfp = true
 			}
-			s.stringify(sb, field, prefix+s.indent, wfp)
+			s.stringify(sb, field, prefix+s.indent, wfp, recursionDepth+1)
 			if i < exportedFields-1 && value.Field(i+1).CanSet() {
 				sb.WriteByte('\n')
 			}

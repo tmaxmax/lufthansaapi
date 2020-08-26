@@ -1,102 +1,192 @@
 package lufthansa
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
+	"sync"
 	"time"
+	"unsafe"
+
+	"golang.org/x/time/rate"
+
+	"github.com/tmaxmax/lufthansaapi/pkg/ratelimithttp"
 )
 
 const (
 	fetchAPI string = "https://api.lufthansa.com/v1"
-	oauthAPI string = fetchAPI + "/oauth/token"
+	oauthAPI        = fetchAPI + "/oauth/token"
 )
 
-// Token represents the object returned by the Lufthansa Oauth,
+type apiResponse interface {
+	// decode decodes into the struct the data from the passed response body. If the response Content-Type
+	// isn't supported by the implementation, it returns ErrUnsupportedFormat.
+	// Every decode implementation shall close the reader1
+	decode(io.ReadCloser) error
+}
+
+// ErrUnsupportedFormat is returned when decoding a response in an unsupported format
+var ErrUnsupportedFormat = errors.New("lufthansaapi: decode: unsupported format")
+
+type expiresIn struct {
+	time.Duration
+}
+
+func (e *expiresIn) UnmarshalJSON(data []byte) error {
+	var t int
+
+	if err := json.Unmarshal(data, &t); err != nil {
+		return err
+	}
+
+	e.Duration = time.Second * time.Duration(t)
+
+	return nil
+}
+
+// token represents the object returned by the Lufthansa Oauth,
 // containing the access token, token type and expiration time.
 // It also holds a generationTime timestamp, that is used for
 // obtaining a new access token, when the old one expired.
-type Token struct {
-	AccessToken    string `json:"access_token"`
-	TokenType      string `json:"token_type"`
-	ExpiresIn      int    `json:"expires_in"`
+type token struct {
+	AccessToken    string    `json:"access_token"`
+	TokenType      string    `json:"token_type"`
+	ExpiresIn      expiresIn `json:"expires_in"`
 	generationTime time.Time
 }
 
-// API represents the main object that you will use to interact with the Lufthansa API.
-type API struct {
-	clientID     string
-	clientSecret string
-	token        *Token
+func (t *token) decode(r io.ReadCloser) error {
+	data, err := ioutil.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	if err = r.Close(); err != nil {
+		return err
+	}
+	switch mimeType(data) {
+	case "application/json":
+		return json.Unmarshal(data, t)
+	}
+	return ErrUnsupportedFormat
 }
 
-func (t Token) String() string {
+func (t *token) String() string {
+	if t == nil {
+		return ""
+	}
 	return fmt.Sprintf("%s %s", strings.Title(t.TokenType), t.AccessToken)
 }
 
-func (a *API) getToken() error {
-	payload := strings.NewReader(fmt.Sprintf("client_id=%s&client_secret=%s&grant_type=client_credentials", a.clientID, a.clientSecret))
-	req, err := http.NewRequest("POST", oauthAPI, payload)
+// API represents the main object that you will use to interact with the Lufthansa API. Initialize it with the
+// NewAPI function. The struct can't be copied and shall be used multiple times. It is safe for concurrent use.
+// Do not create a new API struct per HTTP request, if your application is a HTTP server, use the same struct globally!
+// Not doing so will mess rate management and authentication, leading to undesired errors!
+type API struct {
+	client       *ratelimithttp.Client
+	clientID     string
+	clientSecret string
+	token        *token
+	tokenMu      sync.RWMutex
+	addr         *API
+}
+
+//go:nosplit
+//go:nocheckptr
+func noescape(p unsafe.Pointer) unsafe.Pointer {
+	x := uintptr(p)
+	return unsafe.Pointer(x ^ 0)
+}
+
+func (a *API) copyCheck() {
+	if a.addr == nil {
+		a.addr = (*API)(noescape(unsafe.Pointer(a)))
+	} else if a.addr != a {
+		panic("lufthansaapi: API: illegal copy of API value")
+	}
+}
+
+func (a *API) setToken(ctx context.Context) error {
+	a.copyCheck()
+	a.tokenMu.Lock()
+	defer a.tokenMu.Unlock()
+
+	var err error
+
+	requestURL := fmt.Sprintf("client_id=%s&client_secret=%s&grant_type=client_credentials", url.QueryEscape(a.clientID), url.QueryEscape(a.clientSecret))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, oauthAPI, strings.NewReader(requestURL))
 	if err != nil {
 		return err
 	}
-	req.Header.Add("content-type", "application/x-www-form-urlencoded")
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	res, err := http.DefaultClient.Do(req)
+	a.token = &token{
+		generationTime: time.Now(),
+	}
+	res, err := a.client.Do(req)
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer checkClose(res.Body, err)
 
-	t := &Token{}
-	err = json.NewDecoder(res.Body).Decode(t)
-	if err != nil {
-		return err
+	return a.token.decode(res.Body)
+}
+
+func (a *API) refreshToken(ctx context.Context) error {
+	a.tokenMu.RLock()
+	if time.Since(a.token.generationTime) >= a.token.ExpiresIn.Duration {
+		a.tokenMu.RUnlock()
+		return a.setToken(ctx)
 	}
-	t.generationTime = time.Now()
-
-	a.token = t
+	a.tokenMu.RUnlock()
 	return nil
 }
 
-func (a *API) getNewToken() error {
-	delta, err := time.ParseDuration(fmt.Sprintf("%ds", a.token.ExpiresIn))
-	if err != nil {
-		return err
+// fetch function returns the API response from the provided URL as an io.ReadCloser. The caller goroutine shall close the reader.
+func (a *API) fetch(ctx context.Context, url string) (io.ReadCloser, error) {
+	a.copyCheck()
+	if err := a.refreshToken(ctx); err != nil {
+		return nil, err
 	}
-	if time.Now().After(a.token.generationTime.Add(delta)) {
-		err = a.getToken()
-		return err
-	}
-	return nil
-}
-
-// fetch function returns the API response from the provided URL as an io.Reader, making it
-// easy to decode XML afterwards, in the required format. This function is called by all the
-// API's Fetch exported functions.
-func (a *API) fetch(url string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("accept", "application/xml")
-	req.Header.Add("authorization", a.token.String())
-	res, err := http.DefaultClient.Do(req)
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Accept", "application/xml")
+	req.Header.Add("Accept", "*/*")
+	req.Header.Add("Authorization", a.token.String())
+	res, err := a.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	return res, nil
+	if err = decodeErrors(res); err != nil {
+		return nil, err
+	}
+	return res.Body, nil
 }
 
 // NewAPI constructs the API object, having as parametres the client's ID and client's secret.
-func NewAPI(id, secret string) (*API, error) {
-	ret := &API{}
-	ret.clientID = id
-	ret.clientSecret = secret
-	err := ret.getToken()
-	if err != nil {
-		return &API{}, err
+func NewAPI(ctx context.Context, id, secret string, reqPerSecond, reqPerHour int) (*API, error) {
+	ret := &API{
+		client: ratelimithttp.NewClient(
+			&http.Client{
+				Timeout: time.Second * 15,
+			},
+			rate.NewLimiter(rate.Every(time.Second), reqPerSecond),
+			rate.NewLimiter(rate.Every(time.Hour), reqPerHour),
+		),
+		clientID:     id,
+		clientSecret: secret,
 	}
+	if err := ret.setToken(ctx); err != nil {
+		return nil, err
+	}
+	ret.addr = ret
 	return ret, nil
 }

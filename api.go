@@ -132,7 +132,6 @@ func (a *API) setToken(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer checkClose(res.Body, err)
 
 	return a.token.decode(res.Body)
 }

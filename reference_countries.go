@@ -68,38 +68,35 @@ func (cs *Countries) fetchFromMeta(ctx context.Context, rel string) (*Countries,
 	return rcs, rcs.decode(fetched)
 }
 
-// iterate iterates using the meta links provided with rel either "next" or "prev". Calling this function with
-// other values will result in undesired behavior. This function locks, don't lock in the caller function!
-func (cs *Countries) iterate(ctx context.Context, direction string) bool {
+// iterate iterates using the meta links provided with the passed rel. This function locks, don't lock in the caller function!
+func (cs *Countries) iterate(ctx context.Context, rel string) bool {
 	cs.mu.Lock()
-	// the mutex must not be unlocked if the receiver value was changed
-	mustUnlock := true
-	defer func(mu *bool) {
-		if *mu {
-			cs.mu.Unlock()
-		}
-	}(&mustUnlock)
+	defer cs.mu.Unlock()
 
-	c, err := cs.fetchFromMeta(ctx, direction)
+	c, err := cs.fetchFromMeta(ctx, rel)
 	if err != nil {
 		cs.err = err
 		return false
 	}
 	if c == nil {
-		if direction == "next" {
-			direction = "previous"
-		} else {
-			direction = "next"
-		}
-		*cs = Countries{
-			meta: meta{
-				Links: metaLinks{
-					direction: cs.meta.Links["self"],
+		if rel == "next" || rel == "previous" {
+			if rel == "next" {
+				rel = "previous"
+			} else {
+				rel = "next"
+			}
+			*cs = Countries{
+				meta: meta{
+					Links: metaLinks{
+						"first": cs.meta.Links["first"],
+						rel:     cs.meta.Links["self"],
+						"last":  cs.meta.Links["last"],
+					},
 				},
-			},
-			api: cs.api,
+				api: cs.api,
+			}
+			cs.mu.Lock()
 		}
-		mustUnlock = false
 		return false
 	}
 	*cs = Countries{
@@ -107,17 +104,8 @@ func (cs *Countries) iterate(ctx context.Context, direction string) bool {
 		meta:      c.meta,
 		api:       c.api,
 	}
-	mustUnlock = false
+	cs.mu.Lock()
 	return true
-}
-
-// HasNext checks if there exists a following set after the current set.
-func (cs *Countries) HasNext() bool {
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
-
-	_, ok := cs.meta.Links["next"]
-	return ok
 }
 
 // Next fetches the next set of countries, overwriting the current one. If an error occurs, the receiver is not overwritten.
@@ -127,66 +115,42 @@ func (cs *Countries) Next(ctx context.Context) bool {
 	return cs.iterate(ctx, "next")
 }
 
-// HasPrevious checks whether the current set has a preceding set.
-func (cs *Countries) HasPrevious() bool {
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
-
-	_, ok := cs.meta.Links["previous"]
-	return ok
-}
-
 // Previous fetches the previous set of countries, overwriting the current one. If an error occurs, the receiver is not overwritten.
-// The methot returns the receiver, which is nil when there is no preceding set available, or returns nil if an error occurred.
+// The method returns the receiver, which is nil when there is no preceding set available, or returns nil if an error occurred.
 // If you want to keep each set individually, call Countries.Copy after iterating to copy the newly fetched set.
 func (cs *Countries) Previous(ctx context.Context) bool {
 	return cs.iterate(ctx, "previous")
 }
 
-// Self refetches the last countries resource fetched. If you want a copy of the current Countries struct, use the
-// Countries.Copy method instead.
-func (cs *Countries) Self(ctx context.Context) (*Countries, error) {
+// HasSelf checks if the set can refetch itself from the API. This returns false only if the struct is in a state where
+// only Countries.Next and Countries.Previous are valid operations (the struct holds no data). Use this to check if the
+// data is available.
+func (cs *Countries) HasSelf() bool {
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
 
-	return cs.fetchFromMeta(ctx, "self")
-}
-
-// HasFirst checks if the first set can be retrieved. If the current set is the first set, this returns false.
-func (cs *Countries) HasFirst() bool {
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
-
-	_, ok := cs.meta.Links["first"]
+	_, ok := cs.meta.Links["self"]
 	return ok
 }
 
-// First fetches the first set of countries, if available.
-func (cs *Countries) First(ctx context.Context) (*Countries, error) {
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
-
-	return cs.fetchFromMeta(ctx, "first")
+// Self refetches the last countries resource fetched, overwriting the current set.
+// If you want a copy of the current Countries struct, use the Countries.Copy method instead.
+func (cs *Countries) Self(ctx context.Context) {
+	cs.iterate(ctx, "self")
 }
 
-// HasLast checks if the last set can be retrieved. If the current set is the last set, this returns false.
-func (cs *Countries) HasLast() bool {
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
-
-	_, ok := cs.meta.Links["last"]
-	return ok
+// First fetches the first set of countries, overwriting the current one, if available.
+func (cs *Countries) First(ctx context.Context) {
+	cs.iterate(ctx, "first")
 }
 
-// Last fetches the last set of countries, if available.
-func (cs *Countries) Last(ctx context.Context) (*Countries, error) {
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
-
-	return cs.fetchFromMeta(ctx, "last")
+// Last fetches the last set of countries, overwriting the current one, if available.
+func (cs *Countries) Last(ctx context.Context) {
+	cs.iterate(ctx, "last")
 }
 
-// Error returns any errors that occurred while calling Countries.Next.
+// Error returns any errors that occurred while calling Countries.Next. It is idempotent, multiple calls after a single
+// iteration return the same result.
 func (cs *Countries) Error() error {
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()

@@ -112,6 +112,7 @@ func (s *Stringifier) stringify(sb *strings.Builder, value reflect.Value, prefix
 				sb.WriteString(prefix)
 			}
 			sb.WriteString("(empty slice/array)")
+			return
 		}
 		l := value.Len()
 		for i := 0; i < l; i++ {
@@ -132,6 +133,7 @@ func (s *Stringifier) stringify(sb *strings.Builder, value reflect.Value, prefix
 				sb.WriteString(prefix)
 			}
 			sb.WriteString("(empty map)")
+			return
 		}
 		l := len(value.MapKeys())
 		for i, j := value.MapRange(), 0; i.Next(); j++ {
@@ -152,6 +154,7 @@ func (s *Stringifier) stringify(sb *strings.Builder, value reflect.Value, prefix
 				sb.WriteString(prefix)
 			}
 			sb.WriteString("(empty struct)")
+			return
 		}
 		var hasExportedFields bool
 		numField := value.NumField()

@@ -1,38 +1,41 @@
 package lufthansa_test
 
 import (
-	"context"
 	"testing"
 
 	lufthansa "github.com/tmaxmax/lufthansaapi"
 	"golang.org/x/text/language"
 )
 
-func TestAPI_FetchCountries(t *testing.T) {
-	cr := api.FetchCountries(&lufthansa.RefParams{Lang: &language.English, Limit: 10})
+func TestAPI_FetchCities(t *testing.T) {
+	cr := api.FetchCities(&lufthansa.RefParams{
+		Limit: 10,
+		Lang:  &language.English,
+	})
+
 	for i := 0; cr.Next(ctx) && i < 2; i++ {
-		t.Log(cr, "\n", cr.String())
+		t.Logf("%s", cr)
 	}
 	if cr.Error() != nil {
 		t.Fatal(cr.Error())
 	}
-	cr.Previous(ctx)
+	cr.Last(ctx)
 	if cr.Error() != nil {
 		t.Fatal(cr.Error())
 	}
 	cr.Next(ctx)
 	for i := 0; cr.Previous(ctx) && i < 2; i++ {
-		t.Log(cr, "\n", cr.String())
+		t.Logf("%s", cr)
 	}
 	if cr.Error() != nil {
 		t.Fatal(cr.Error())
 	}
 }
 
-func TestAPI_FetchCountry(t *testing.T) {
-	c, err := api.FetchCountry(context.Background(), "RO", nil)
+func TestAPI_FetchCity(t *testing.T) {
+	city, err := api.FetchCity(ctx, "BUH", &language.Russian)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("%s", c)
+	t.Logf("%s", city)
 }

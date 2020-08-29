@@ -3,16 +3,16 @@ package lufthansa
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 	"unsafe"
+
+	"github.com/tmaxmax/lufthansaapi/internal/util"
 
 	"golang.org/x/time/rate"
 
@@ -31,22 +31,16 @@ type apiResponse interface {
 	decode(io.ReadCloser) error
 }
 
-// ErrUnsupportedFormat is returned when decoding a response in an unsupported format
-var ErrUnsupportedFormat = errors.New("lufthansaapi: decode: unsupported format")
-
 type expiresIn struct {
 	time.Duration
 }
 
 func (e *expiresIn) UnmarshalJSON(data []byte) error {
 	var t int
-
 	if err := json.Unmarshal(data, &t); err != nil {
 		return err
 	}
-
 	e.Duration = time.Second * time.Duration(t)
-
 	return nil
 }
 
@@ -62,18 +56,7 @@ type token struct {
 }
 
 func (t *token) decode(r io.ReadCloser) error {
-	data, err := ioutil.ReadAll(r)
-	if err != nil {
-		return err
-	}
-	if err = r.Close(); err != nil {
-		return err
-	}
-	switch mimeType(data) {
-	case "application/json":
-		return json.Unmarshal(data, t)
-	}
-	return ErrUnsupportedFormat
+	return util.Decode(r, t)
 }
 
 func (t *token) String() string {

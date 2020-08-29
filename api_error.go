@@ -1,10 +1,11 @@
 package lufthansa
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/tmaxmax/lufthansaapi/internal/util"
 )
 
 type (
@@ -39,22 +40,11 @@ type (
 //}
 //
 //func (bre *BadRequestError) String() string {
-//	return stringifier.Stringify(bre, "")
+//	return stringer.Stringify(bre, "")
 //}
 //
 //func (bre *BadRequestError) decode(r io.ReadCloser) error {
-//	data, err := readAllCloser(r)
-//	if err != nil {
-//		return err
-//	}
-//	fmt.Println(string(data))
-//	switch mimeType(data) {
-//	case "text/xml", "application/xml":
-//		return xml.Unmarshal(data, bre)
-//	case "application/json":
-//		return json.Unmarshal(data, bre)
-//	}
-//	return ErrUnsupportedFormat
+//	return util.Decode(r, bre)
 //}
 
 func (ge *GatewayError) Error() string {
@@ -62,19 +52,11 @@ func (ge *GatewayError) Error() string {
 }
 
 func (ge *GatewayError) String() string {
-	return stringifier.Stringify(ge, "")
+	return util.Stringer.Stringify(ge, "")
 }
 
 func (ge *GatewayError) decode(r io.ReadCloser) error {
-	data, err := readAllCloser(r)
-	if err != nil {
-		return err
-	}
-	switch mimeType(data) {
-	case "application/json":
-		return json.Unmarshal(data, ge)
-	}
-	return ErrUnsupportedFormat
+	return util.Decode(r, ge)
 }
 
 func (ae *APIError) Error() string {
@@ -82,11 +64,11 @@ func (ae *APIError) Error() string {
 }
 
 func (ae *APIError) String() string {
-	return stringifier.Stringify(ae, "")
+	return util.Stringer.Stringify(ae, "")
 }
 
 func (ae *APIError) decode(r io.ReadCloser) error {
-	return decode(r, ae)
+	return util.Decode(r, ae)
 }
 
 func (ue *unknownError) Error() string {
@@ -94,7 +76,7 @@ func (ue *unknownError) Error() string {
 }
 
 func (ue *unknownError) decode(r io.ReadCloser) error {
-	data, err := readAllCloser(r)
+	data, err := util.ReadAll(r)
 	if err != nil {
 		return err
 	}

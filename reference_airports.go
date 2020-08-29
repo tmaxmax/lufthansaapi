@@ -1,63 +1,150 @@
 package lufthansa
 
 import (
-	"encoding/xml"
-	"fmt"
+	"context"
+	"io"
 	"strings"
+
+	"github.com/tmaxmax/lufthansaapi/internal/util"
+	"golang.org/x/text/language"
 )
 
-// FetchAirports requests from the airports reference. Pass parameters as mentioned in
-// the API documentation: https://developer.lufthansa.com/docs/read/api_details/reference_data/Airports.
-//
-// The function returns a pointer to the decoded cities response struct. If this is nil, the function
-// will return either an APIError pointer, a GatewayError pointer or an error. If there is an APIError, then
-// there is no GatewayError and vice-versa. Check first for errors.
-func (a *lufthansa.API) FetchAirports(p lufthansa.RefParams, LHOperated bool) (*AirportsReference, interface{}, error) {
-	url := strings.Builder{}
-	url.WriteString(fmt.Sprintf("%s/airports/%s", lufthansa.mdsReferenceAPI, p.ToURL()))
-	if strings.Contains(url.String(), "?") {
-		url.WriteString(fmt.Sprintf("&LHoperated=%t", LHOperated))
-	} else {
-		url.WriteString(fmt.Sprintf("?LHoperated=%t", LHOperated))
+type (
+	airportPosition struct {
+		Latitude  float64 `xml:"Coordinate>Latitude" json:"Coordinate.Latitude"`
+		Longitude float64 `xml:"Coordinate>Longitude" json:"Coordinate.Longitude"`
+	}
+	airportUnmarshal struct {
+		AirportCode  string                   `xml:"AirportCode" json:"AirportCode"`
+		Position     airportPosition          `xml:"Position" json:"Position"`
+		CityCode     string                   `xml:"CityCode" json:"CityCode"`
+		CountryCode  string                   `xml:"CountryCode" json:"CountryCode"`
+		LocationType string                   `xml:"LocationType" json:"LocationType"`
+		Names        []referenceNameUnmarshal `xml:"Names>Name" json:"Names.Name"`
+		UTCOffset    string                   `xml:"UtcOffset" json:"UtcOffset"`
+		TimeZoneID   string                   `xml:"TimeZoneId" json:"TimeZoneId"`
+	}
+	airportsUnmarshal struct {
+		Airports []airportUnmarshal `xml:"Airports>Airport" json:"AirportResource.Airports.Airport"`
+		Meta     metaUnmarshal      `xml:"Meta" json:"AirportResource.Meta"`
 	}
 
-	res, err := a.fetch(url.String())
-	if err != nil {
-		return nil, nil, err
+	Airport struct {
+		AirportCode  string
+		Position     airportPosition
+		CityCode     string
+		CountryCode  string
+		LocationType string
+		Names        referenceNames
+		UTCOffset    string
+		TimeZoneID   string
 	}
+	Airports struct {
+		Airports []Airport
+		meta     meta
+		iterator
+	}
+)
 
-	switch res.StatusCode {
-	case 200:
-		ret := &AirportsReference{}
-		err = xml.NewDecoder(res.Body).Decode(ret)
-		if err != nil {
-			return nil, nil, err
+func (as *Airports) decode(r io.ReadCloser) error {
+	au := &airportsUnmarshal{}
+	if err := util.Decode(r, au); err != nil {
+		return err
+	}
+	as.Airports = make([]Airport, len(au.Airports))
+	for i := range as.Airports {
+		as.Airports[i].make(&au.Airports[i])
+	}
+	as.meta.make(&au.Meta)
+	return nil
+}
+
+func (as *Airports) metadata() *meta {
+	return &as.meta
+}
+
+func (as *Airports) Copy(newAPI *API) *Airports {
+	r := &Airports{
+		Airports: make([]Airport, 0, len(as.Airports)),
+		iterator: as.iterator.copy(newAPI),
+	}
+	for i := range as.Airports {
+		r.Airports = append(r.Airports, *as.Airports[i].Copy())
+	}
+	return r
+}
+
+func (as *Airports) String() string {
+	return util.Stringer.Stringify(as, "")
+}
+
+func (a *Airport) decode(r io.ReadCloser) error {
+	au := &airportsUnmarshal{}
+	if err := util.Decode(r, au); err != nil {
+		return err
+	}
+	a.make(&au.Airports[0])
+	return nil
+}
+
+func (a *Airport) make(au *airportUnmarshal) {
+	a.AirportCode = au.AirportCode
+	a.Position = au.Position
+	a.CityCode = au.CityCode
+	a.CountryCode = au.CountryCode
+	a.LocationType = au.LocationType
+	a.Names.make(au.Names)
+	a.UTCOffset = au.UTCOffset
+	a.TimeZoneID = au.TimeZoneID
+}
+
+func (a *Airport) Copy() *Airport {
+	return &Airport{
+		AirportCode:  a.AirportCode,
+		Position:     a.Position,
+		CityCode:     a.CityCode,
+		CountryCode:  a.CountryCode,
+		LocationType: a.LocationType,
+		Names:        a.Names.Copy(),
+		UTCOffset:    a.UTCOffset,
+		TimeZoneID:   a.TimeZoneID,
+	}
+}
+
+func (a *Airport) String() string {
+	return util.Stringer.Stringify(a, "")
+}
+
+func (a *API) FetchAirports(p *RefParams, LHOperated bool) *Airports {
+	url := mdsReferenceAPI + "/airports/" + p.ToURL()
+	if LHOperated {
+		if strings.Contains(url, "?") {
+			url += "&LHoperated=1"
+		} else {
+			url += "?LHoperated=1"
 		}
-		res.Body.Close()
-		return ret, nil, nil
-	default:
-		apiErr, err := lufthansa.decodeErrors(res)
-		return nil, apiErr, err
 	}
+	as := &Airports{
+		meta: meta{
+			links: metaLinks{
+				metaKeyNext: url,
+			},
+		},
+		iterator: iterator{
+			api: a,
+		},
+	}
+	as.iterator.ref = as
+	return as
 }
 
-type airportPosition struct {
-	Latitude  float64 `xml:"Coordinate>Latitude"`
-	Longitude float64 `xml:"Coordinate>Longitude"`
-}
+func (a *API) FetchAirport(ctx context.Context, airportCode string, lang *language.Tag) (*Airport, error) {
+	p := &RefParams{code: airportCode, Lang: lang}
+	fetched, err := a.fetch(ctx, mdsReferenceAPI+"/airports/"+p.ToURL())
+	if err != nil {
+		return nil, err
+	}
 
-type airport struct {
-	AirportCode  string                    `xml:"AirportCode"`
-	Position     airportPosition           `xml:"Position"`
-	CityCode     string                    `xml:"CityCode"`
-	CountryCode  string                    `xml:"CountryCode"`
-	LocationType string                    `xml:"LocationType"`
-	Names        []lufthansa.referenceName `xml:"Names>Name"`
-	UTCOffset    string                    `xml:"UtcOffset"`
-	TimeZoneID   string                    `xml:"TimeZoneId"`
-}
-
-type AirportsReference struct {
-	Airports []airport        `xml:"Airports>Airport"`
-	Meta     []lufthansa.meta `xml:"Meta"`
+	r := &Airport{}
+	return r, r.decode(fetched)
 }
